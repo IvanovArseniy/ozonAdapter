@@ -23,6 +23,6 @@ $router->group(['prefix' => 'test'], function() use ($router) {
 });
 
 $router->group(['prefix' => 'products', 'middleware' => 'auth'], function() use ($router) {
-    $router->get('/', 'ProductController@getProductList');
+    $router->get('/{productId}', 'ProductController@getProductList');
     $router->post('/', 'ProductController@createProduct');
 });

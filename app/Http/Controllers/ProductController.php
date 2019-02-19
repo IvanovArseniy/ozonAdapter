@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Log;
 use Laravel\Lumen\Routing\Controller as BaseController;
 use Illuminate\Http\Request as Request;
 use App\Services\OzonService;
@@ -10,16 +11,17 @@ use App\Entities\Product;
 class ProductController extends BaseController
 {
     //public function getProductList()
-    public function getProductList(OzonService $ozonService)
+    public function getProductList(OzonService $ozonService, Request $request)
     {
         //$test = app(AuthServiceProvider:class);
         // $res = $ozonProvider->getProductList();
         //$c = new OzonService();
-        $res = $ozonService->getProductList();
+        Log::info('Get product list:'. $request->input('productId'));
+        $res = $ozonService->getProductList($request->input('productId'));
         return response()->json($res['result']);
     }
 
-    public function createProduct(Request $request, OzonService $ozonService)
+    public function createProduct(OzonService $ozonService, Request $request)
     {
         // $barcode = $request->input('barcode');
         // $description = $request->input('description');
@@ -37,9 +39,9 @@ class ProductController extends BaseController
         // $dimension_unit = $request->input('dimension_unit');
         // $weight = $request->input('weight');
         // $weight_unit = $request->input('weight_unit');
-        $products = $request->input('items');
-        //return $products;
-        $result = $ozonService->createProduct($products);
+        $product = json_decode($request->getContent());
+        Log::info('Create product:'. json_encode($request->getContent()));
+        $result = $ozonService->createProduct($product);
         return response()->json($result);
     }
 }

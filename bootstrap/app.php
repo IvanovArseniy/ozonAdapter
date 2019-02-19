@@ -92,6 +92,9 @@ $app->register(App\Providers\DropshippServiceProvider::class);
 |
 */
 
+$app->configure('app');
+$app->configure('database');
+
 $app->router->group([
     'namespace' => 'App\Http\Controllers',
 ], function ($router) {
