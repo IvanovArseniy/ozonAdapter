@@ -6,7 +6,6 @@ use Log;
 use Laravel\Lumen\Routing\Controller as BaseController;
 use Illuminate\Http\Request as Request;
 use App\Services\OzonService;
-use App\Entities\Product;
 
 class ProductController extends BaseController
 {

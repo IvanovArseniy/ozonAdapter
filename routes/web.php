@@ -26,3 +26,9 @@ $router->group(['prefix' => 'products', 'middleware' => 'auth'], function() use 
     $router->get('/{productId}', 'ProductController@getProductList');
     $router->post('/', 'ProductController@createProduct');
 });
+
+$router->group(['prefix' => 'orders', 'middleware' => 'auth'], function() use ($router) {
+    $router->get('/{orderId}', 'OrderController@getOrderInfo');
+    $router->put('/{orderId}', 'OrderController@setOrderStatus');
+    $router->get('/', 'OrderController@getOrderList');
+});
