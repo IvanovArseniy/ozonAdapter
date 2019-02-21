@@ -15,7 +15,7 @@ class AuthMiddleware
 
     public function handle($request, Closure $next)
     {
-        if ($request->header('Authorization') && $request->header('Authorization') == $this->authToken) {
+        if ($request->get('token') && $request->get('token') == $this->authToken) {
             return $next($request);
         }
         return response('Unauthorized', 401);

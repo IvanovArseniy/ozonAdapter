@@ -22,13 +22,28 @@ $router->get('foo', function() {
 $router->group(['prefix' => 'test'], function() use ($router) {
 });
 
-$router->group(['prefix' => 'products', 'middleware' => 'auth'], function() use ($router) {
+$router->group(['prefix' => '1/products', 'middleware' => 'auth'], function() use ($router) {
     $router->get('/{productId}', 'ProductController@getProductList');
     $router->post('/', 'ProductController@createProduct');
+    $router->pot('/{productId}', 'ProductController@createProductCombination');
+    $router->put('/{productId}', 'ProductController@updateProduct');
+    $router->delete('/{productId}', 'ProductController@deleteProduct');
+
+    $router->post('/{productId}/image', 'ProductController@addMainImage');
+    $router->post('/{productId}/gallery', 'ProductController@addGalleryImage');
+    $router->delete('/{productId/gallery/{imageId}', 'ProductController@deleteGalleryImage');
+    $router->post('/{productId}/combinations/{combinationId}/image', 'ProductController@addGalleryImageForCombination');
 });
 
-$router->group(['prefix' => 'orders', 'middleware' => 'auth'], function() use ($router) {
+$router->group(['prefix' => '1/orders', 'middleware' => 'auth'], function() use ($router) {
     $router->get('/{orderId}', 'OrderController@getOrderInfo');
     $router->put('/{orderId}', 'OrderController@setOrderStatus');
     $router->get('/', 'OrderController@getOrderList');
+});
+
+$router->group(['prefix' => '1/categories', 'middleware' => 'auth'], function() use ($router) {
+    $router->get('/{categoryId}', 'CategoryController@getCategoryName');
+    $router->get('/', 'CategoryController@getCategoryList');
+    $router->post('/', 'CategoryController@addCategory');
+    $router->put('/{categoryId}', 'CategoryController@updateCategoryName');
 });

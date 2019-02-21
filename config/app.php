@@ -7,6 +7,7 @@ return [
     'ozon_base_url' => 'http://cb-api.test.ozon.ru',
     'ozon_productlist_url' => '/v1/product/info',
     'ozon_createrpoduct_url' => '/v1/product/import',
+    'ozon_product_group_attribute' => 8292,
 
     'ozon_orderlist_url' => '/v1/order/list',
     'ozon_orderinfo_url' => '/v1/order/{orderId}?translit=true',
@@ -18,5 +19,8 @@ return [
     'dropshipp_base_url' => 'http://dev.dropshipp.io',
     'dropshipp_token_url' => '?-apikey={api_key}&token={owner_token}',
     //'dropshipp_order_url' => '/api/v1/orders/{owner_id}/{store_num}'
-    'dropshipp_order_url' => '/api/v1/orders/1/{store_num}'
+    'dropshipp_order_url' => '/api/v1/orders/1/{store_num}',
+
+    'active_category_id' => '1',
+    'active_category_name' => 'test'
 ];
