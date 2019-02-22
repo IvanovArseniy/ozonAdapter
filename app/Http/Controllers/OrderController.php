@@ -15,6 +15,9 @@ class OrderController extends BaseController
     {
         Log::info('Get order info:'. $request->input('orderId'));
         $result = $ozonService->getOrderInfo($request->input('orderId'));
+        //TODO:status mapping
+
+        //paymentStatus: AWAITING_PAYMENT, ID, CANCELLED, REFUNDED, PARTIALLY_REFUNDED, INCOMPLETE
         $response = [
             //'paymentStatus': {paymentStatus} ??
             'fulfillmentStatus' => $result->status,

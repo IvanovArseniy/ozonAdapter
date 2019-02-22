@@ -12,9 +12,6 @@ class ProductController extends BaseController
     //public function getProductList()
     public function getProductList(OzonService $ozonService, Request $request)
     {
-        //$test = app(AuthServiceProvider:class);
-        // $res = $ozonProvider->getProductList();
-        //$c = new OzonService();
         Log::info('Get product list:'. $request->input('productId'));
         $res = $ozonService->getProductList($request->input('productId'));
         return response()->json($res['result']);
@@ -22,25 +19,47 @@ class ProductController extends BaseController
 
     public function createProduct(OzonService $ozonService, Request $request)
     {
-        // $barcode = $request->input('barcode');
-        // $description = $request->input('description');
-        // $category_id = $request->input('category_id');
-        // $name = $request->input('name');
-        // $offer_id = $request->input('offer_id');
-        // $price = $request->input('price');
-        // $old_price = $request->input('old_price');
-        // $vat = $request->input('vat');
-        // $vendor = $request->input('vendor');
-        // $vendor_code = $request->input('vendor_code');
-        // $height = $request->input('height');
-        // $depth = $request->input('depth');
-        // $width = $request->input('width');
-        // $dimension_unit = $request->input('dimension_unit');
-        // $weight = $request->input('weight');
-        // $weight_unit = $request->input('weight_unit');
         $product = json_decode($request->getContent());
         Log::info('Create product:'. json_encode($request->getContent()));
-        $result = $ozonService->createProduct($product);
-        return response()->json($result);
+        $productId = $ozonService->createProduct($product);
+        return response()->json(['id' => $productId]);
+    }
+
+    public function createProductCombination(OzonService $ozonService, Request $request)
+    {
+        $productId = $request->input('productId');
+        $combination = json_decode($request->getContent());
+        Log::info('Create product combination:'. json_encode($request->getContent()));
+        $result = $ozonService->createProductCombination($productId, $combination);
+    }
+
+    public function updateProduct(OzonService $ozonService, Request $request)
+    {
+        # code...
+    }
+
+    public function deleteProduct(OzonService $ozonService, Request $request)
+    {
+        # code...
+    }
+
+    public function addMainImage(OzonService $ozonService, Request $request)
+    {
+        # code...
+    }
+
+    public function addGalleryImage(OzonService $ozonService, Request $request)
+    {
+        # code...
+    }
+
+    public function deleteGalleryImage(OzonService $ozonService, Request $request)
+    {
+        # code...
+    }
+
+    public function addGalleryImageForCombination(OzonService $ozonService, Request $request)
+    {
+        # code...
     }
 }

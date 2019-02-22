@@ -7,6 +7,7 @@ return [
     'ozon_base_url' => 'http://cb-api.test.ozon.ru',
     'ozon_productlist_url' => '/v1/product/info',
     'ozon_createrpoduct_url' => '/v1/product/import',
+    'ozon_update_stocks_url' => '/v1/products/stocks',
     'ozon_product_group_attribute' => 8292,
 
     'ozon_orderlist_url' => '/v1/order/list',

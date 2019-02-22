@@ -9,95 +9,142 @@ class OzonService
 
     protected $productListUrl = config('app.ozon_productlist_url');
     protected $createProductsUrl = config('app.ozon_createrpoduct_url');
+    protected $updateStocksUrl = config('app.ozon_update_stocks_url');
 
     protected $orderListUrl = config('app.ozon_orderlist_url');
     protected $orderInfoUrl = config('app.ozon_orderinfo_url');
     protected $setOrderStatusUrl = '';
 
-    protected function addHeaders($ch)
-    {
-        curl_setopt($ch,
-            CURLOPT_HTTPHEADER,
-            array('Client-Id: ' . config('app.ozon_api_client_id'), 'Api-Key: ' . config('app.ozon_api_key')));
-    }
-
     public function getProductList($productId)
     {
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->productListUrl);
-        $this->addHeaders($ch);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        $data_string = json_encode(['product_id' => $productId]);
-        $response = curl_exec($ch);
-        curl_close($ch);
-        $result = json_decode($response, true);
-        Log::info('Ozon products: ' . $response);
-        return $result;
+        $ozonProductResult = $this->getOzonProductId($productId);
+        if ($ozonProductResult->Success) {
+            $interactionId = com_create_guid();
+            Log::info($interactionId . ' => Get product info from ozon:' . $productId);
+            $response = $this->sendData($this->productListUrl, ['product_id' => $productId]);
+            Log::info($interactionId . ' => Ozon products: ' . $response);
+            $result = json_decode($response, true);
+            return $result;
+        }
+        else return $ozonProductResult;
     }
 
     public function createProduct($product)
     {
         $items = array();
-        if (count($product->variants) == 0) {
-            array_push($items, [
-                'barcode' => strval($product->sku),
-                'description' => $product->description,
-                'category_id' => 17030819,
-                'name' => $product->name,
-                'offer_id' => $product->sku,
-                'price' => strval($product->price),
-                'vat'=> '0',
-                'weight' => $product->weight,
-                'weight_unit' => 'g',
-                'images' => array([
-                    'file_name' => 'https://ozon-st.cdn.ngenix.net/multimedia/c1200/1022555115.jpg',
-                    'default' => true
-                ])
-            ]);
-        }
-        else {
+        $this->addProductToRequest($items, 0, $product->sku, $product->description, $product->name, $product->price, $product->weight, $product->quantity, $product->unlimited, $product->enabled);
+        if (count($product->variants) > 0) {
             foreach ($product->variants as $key => $variant) {
-                array_push($items, [
-                    'barcode' => strval($variant->mallVariantId),
-                    'description' => $product->description,
-                    'category_id' => 17030819,
-                    'name' => $product->name,
-                    'offer_id' => $product->sku,
-                    'price' => strval($variant->price),
-                    'vat'=> '0',
-                    'weight' => $product->weight,
-                    'weight_unit' => 'g',
-                    'images' => array([
-                        'file_name' => 'https://ozon-st.cdn.ngenix.net/multimedia/c1200/1022555115.jpg',
-                        'default' => true
-                    ])
-                ]);
-                //app('db')->connection('mysql')->insert('insert into product (Id, ozonProductId, ozonProductChangeDate) values(?, ?, ?)', [$variant->mallVariantId, 1, date('Y-m-d H:i:s')]);
+                $this->addProductToRequest($items, $variant->mallVariantId, $product->sku, $product->description, $product->name, $variant->price, $variant->inventory, $product->weight, $product->unlimited, $product->enabled);
             }
         }
 
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->createProductsUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        $data_string = json_encode(['items' => $items]);
-        Log::info('Create product request to ozon:', ['items' => $items]);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $data_string);  
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-            'Client-Id: 466',
-            'Api-Key: 9753260e-2324-fde7-97f1-7848ed7ed097',                                                                   
-            'Content-Type: application/json',                                                                                
-            'Content-Length: ' . strlen($data_string))                                                                
-        );  
-        $response = curl_exec($ch);
-        curl_close($ch);
+        $interactionId = com_create_guid();
+        Log::info($interactionId . ' => Create product request to ozon:' , json_encode(['items' => $items]);
+        $response = $this->sendData($this->createProductsUrl, ['items' => $items]);
+        Log::info($interactionId . ' => Create ozon products: ' . $response);
         $result = json_decode($response, true);
-        Log::info('Create ozon product: ' . $response);
-        return $result;
+
+        $productId = 0;
+        $quantityItems = array();
+        for ($i=0; $i < count($result->result); $i++) { 
+            app('db')->connection('mysql')->table('product_variants')
+                ->insert([
+                    'ozonProductId' => $result->result[i],
+                    'productId' => $items[i]->dropshippProductId,
+                    'variantId' => $items[i]->dropshippVariantId
+                ]);
+
+            array_push($quantityItems, [
+                'product_id' => $result->result[i],
+                'stock' => $items[i]->quantity
+            ]);
+
+            $productId = $items[i]->productId;
+        }
+
+        $this->setQuantity($quantityItems);
+
+        return $productId;
     }
 
-    protected function sendProductToOzon($product)
+    protected function addProductToRequest($items, $dropshippVariantId, $sku, $description, $name, $price, $weight, $quantity, $unlimited, $enabled);
     {
+        $pdo = app('db')->connection('mysql')->getPdo();
+        $result = app('db')-connection('mysql')->table('product')
+            ->insert([
+                'name' => $name,
+                'sku' => $sku,
+                'enabled' => $enabled
+            ]);
+        if ($result)  {
+            $productId = $pdo->lastInsertId();
 
+            array_push($items, [
+                'productId' => $prductId,
+                'dropshippVariantId' => $dropshippVariantId,
+                'barcode' => strval($sku),
+                'description' => $description,
+                'category_id' => config('app.active_category_id'),
+                'name' => $name,
+                'offer_id' => $sku,
+                'price' => strval($price),
+                'vat'=> '0',
+                'weight' => $weight,
+                'weight_unit' => 'g',
+                'quantity' => $quantity,
+                'images' => array([
+                    'file_name' => 'https://ozon-st.cdn.ngenix.net/multimedia/c1200/1022555115.jpg',
+                    'default' => true
+                ]),
+                'attributes' => array([
+                    'id' => config('app.ozon_product_group_attribute'),
+                    'value' => $name . '(' . $sku . ')'
+                ]),
+                "visibility_details": [
+                    'has_price': true,
+                    'has_stock': $unlimited,
+                    'active_product': $enabled
+                ]
+            ]);
+        }
+        else
+        {
+            Log::error('Insert product to database failed' . $result);
+        }
+
+        return $items;
+    }
+
+    protected function setQuantity($items)
+    {
+        $interactionId = com_create_guid();
+        Log::info($interactionId . ' => Update stocks request to ozon:', json_encode(['stocks' => $items]));
+        $response = $this->sendData($this->updateStocksUrl, ['stocks' => $items]);
+        Log::info($interactionId . ' => Update stocks response: ' . $response);
+        $result = json_decode($response, true);
+    }
+
+    public function createProductCombination($productId, $combination)
+    {
+        $ozonProduct = $this->getProductList($ozonProductId);
+    }
+
+    protected function getOzonProductId($productId)
+    {
+        $product = app('db')->connection('mysql')->table->('product')->where('dropshippId', $productId)->first();
+        if ($product) {
+            return [
+                'Success' => true,
+                'Id' => $product->ozonProductId
+            ];
+        }
+        else {
+            return [
+                'Success' => false,
+                'Error' => 'Product with ID ' . $productId . ' doesn\'t exists!'
+            ];
+        }
     }
 
     public function getOrderList()
@@ -112,24 +159,12 @@ class OzonService
             'to' => $to->format('Y-m-d\TH:i:s.u'),
             'delivery_schema' => 'fbs'
         ];
-        
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->orderListUrl);
-        $this->addHeaders($ch);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        $data_string = json_encode($data);
-        Log::info('Get orders from ozon:', $data);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $data_string);  
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-            'Client-Id: 466',
-            'Api-Key: 9753260e-2324-fde7-97f1-7848ed7ed097',                                                                   
-            'Content-Type: application/json',                                                                                
-            'Content-Length: ' . strlen($data_string))
-        );  
-        $response = curl_exec($ch);
-        curl_close($ch);
+
+        $interactionId = com_create_guid();
+        Log::info($interactionId . ' => Get orders from ozon:', $data);
+        $response = $this->sendData($this->orderListUrl, $data);
+        Log::info($interactionId . ' => Ozon order info: ' . $response);
         $result = json_decode($response, true);
-        Log::info('Ozon order info: ' . $response);
 
         $notifyOrders = ['newOrders' => array(), 'existedOrders' => array(), 'deletedOrders' => array()]];
         $ozonOrders = $result->orders;
@@ -175,14 +210,11 @@ class OzonService
 
     public function getOrderInfo($orderId)
     {
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, str_replace('{orderId}', $orderId, $this->baseUrl . $this->orderInfoUrl));
-        $this->addHeaders($ch);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        $response = curl_exec($ch);
-        curl_close($ch);
+        $interactionId = com_create_guid();
+        Log::info($interactionId . ' => Get order info from ozon: ' . $orderId);
+        $response = $this->sendData(str_replace('{orderId}', $orderId, $this->orderInfoUrl));
+        Log::info($interactionId . ' => Ozon order info: ' . $response);
         $result = json_decode($response, true);
-        Log::info('Ozon order info: ' . $response);
 
         $fullItems = array();
         foreach ($result->items as $key => $item) {
@@ -214,7 +246,27 @@ class OzonService
 
     public function setOrderStatus($orderId)
     {
+        //TODO:set status in ozon
         // $result = $this->getOrderInfo($orderId);
         // return $result->status;
+    }
+
+    protected sendData($url, $data)
+    {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $headers = array(
+            'Client-Id: ' . config('app.ozon_api_client_id'),
+            'Api-Key: ' . config('app.ozon_api_key')
+        );
+        if ($data) {
+            array_push($headers, ['Content-Type: application/json', 'Content-Length: ' . strlen($data_string)]);
+            $data_string = json_encode(['items' => $items]);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $data_string);
+        }
+        $response = curl_exec($ch);
+        curl_close($ch);
+        return $response;
     }
 }
