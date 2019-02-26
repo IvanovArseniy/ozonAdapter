@@ -10,7 +10,6 @@ use App\Services\DropshippService;
 
 class OrderController extends BaseController
 {
-    //public function getProductList()
     public function getOrderInfo(OzonService $ozonService, Request $request)
     {
         Log::info('Get order info:'. $request->input('orderId'));

@@ -5,9 +5,13 @@ return [
     'ozon_api_key' => '9753260e-2324-fde7-97f1-7848ed7ed097',
 
     'ozon_base_url' => 'http://cb-api.test.ozon.ru',
-    'ozon_productlist_url' => '/v1/product/info',
-    'ozon_createrpoduct_url' => '/v1/product/import',
+    'ozon_productinfo_url' => '/v1/product/info',
+    'ozon_createrproduct_url' => '/v1/product/import',
     'ozon_update_stocks_url' => '/v1/products/stocks',
+    'ozon_updateproduct_url' => '/v1/products/update',
+    'deactivate_product_url' => '/v1/products/activate',
+    'activate_product_url' => '/v1/products/deactivate',
+    'update_productprices_url' => '/v1/products/prices',
     'ozon_product_group_attribute' => 8292,
 
     'ozon_orderlist_url' => '/v1/order/list',
