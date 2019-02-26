@@ -16,7 +16,8 @@ return [
 
     'ozon_orderlist_url' => '/v1/order/list',
     'ozon_orderinfo_url' => '/v1/order/{orderId}?translit=true',
-
+    'ozon_approveorder_url' => '/v1/order/items/approve/crossborder',
+    'ozon_cancelorder_url' => '/v1/order/items/cancel/crossborder',
 
     'dropshipp_key' => 'testKey',
     'dropshipp_owner_token' => 'testToken',
@@ -27,5 +28,19 @@ return [
     'dropshipp_order_url' => '/api/v1/orders/1/{store_num}',
 
     'active_category_id' => '1',
-    'active_category_name' => 'test'
+    'active_category_name' => 'test',
+
+    'order_approve_status' => 'PROCESSING',
+    'order_cancel_status' => 'RETURNED',
+    'order_cancel_reason' => 358,
+    'order_status' => [
+        'AWAITING_APPROVE' => 'AWAITING_PROCESSING',
+        'AWAITING_PACKAGING' => 'PROCESSING', 
+        'AWAITING_DELIVER' => 'PROCESSING',
+        'DELIVERING' => 'SHIPPED',
+        'DELIVERED' => 'DELIVERED',
+        //'CANCELLED' => 'WILL_NOT_DELIVER',
+        'CANCELLED' => 'RETURNED',
+        'DELIVERED' => 'READY_FOR_PICKUP'
+    ]
 ];

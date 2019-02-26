@@ -29,7 +29,7 @@ class DropshippService
     
     protected function notifyExistedOrders($orders)
     {
-        Log::info('Existed orders:' . $orders);
+        Log::info('Existed orders:' . json_encode($orders));
         foreach ($orders as $key => $order) {
             $data_string = json_encode([
                 'oldFulfillmentStatus' => $order->oldStatus,
@@ -51,7 +51,7 @@ class DropshippService
 
     protected function notifyNewOrders($orders)
     {
-        Log::info('New orders:' . $orders);
+        Log::info('New orders:' . json_encode($orders));
         foreach ($orders as $key => $order) {
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $this->baseUrl . str_replace('store_num', $order->id, $this->orderUrl) . $tokenUrl);
@@ -64,7 +64,7 @@ class DropshippService
 
     protected public function notifyDeletedOrders($orders)
     {
-        Log::info('Deleted orders:' . $orders);
+        Log::info('Deleted orders:' . json_encode($orders));
         foreach ($orders as $key => $order) {
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $this->baseUrl . str_replace('store_num', $order->id, $this->orderUrl) . $tokenUrl);
