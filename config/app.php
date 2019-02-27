@@ -19,6 +19,8 @@ return [
     'ozon_approveorder_url' => '/v1/order/items/approve/crossborder',
     'ozon_cancelorder_url' => '/v1/order/items/cancel/crossborder',
 
+    'ozon_categorylist_url' => '/v1/categories/tree',
+
     'dropshipp_key' => 'testKey',
     'dropshipp_owner_token' => 'testToken',
 

@@ -14,13 +14,14 @@ class OzonService
     protected $activateProductUrl = config('app.activate_product_url');
     protected $deactivateProductUrl = config('app.deactivate_product_url');
     protected $updatePricesUrl = config('app.update_productprices_url');
-    protected $approveOrderUrl = config('app.ozon_approveorder_url');
-    protected $cancelOrderUrl = config('app.ozon_cancelorder_url');
 
     protected $orderListUrl = config('app.ozon_orderlist_url');
     protected $orderInfoUrl = config('app.ozon_orderinfo_url');
-    protected $setOrderStatusUrl = '';
+    protected $approveOrderUrl = config('app.ozon_approveorder_url');
+    protected $cancelOrderUrl = config('app.ozon_cancelorder_url');
 
+    protected $categoryListUrl = config('app.ozon_categorylist_url');
+    
     public function getProductFullInfo($productId)
     {
         //Get mall items here and make response
@@ -96,10 +97,39 @@ class OzonService
         }  
 
         $items = array();
-        $this->addProductToRequest($items, 0, $product->sku, $product->description, $product->name, $product->price, $product->weight, $product->quantity, $product->unlimited, $product->enabled, $productId);
+        $this->addProductToRequest(
+            $items,
+            0,
+            $product->sku,
+            $product->description,
+            $product->name, $product->price,
+            $product->weight,
+            $product->quantity,
+            $product->unlimited,
+            $product->enabled,
+            $product->categoryId,
+            null,
+            null,
+            $productId
+        );
         if (count($product->variants) > 0) {
             foreach ($product->variants as $key => $variant) {
-                $this->addProductToRequest($items, $variant->mallVariantId, $product->sku, $product->description, $product->name, $variant->price, $variant->inventory, $product->weight, $product->unlimited, $product->enabled, $productId);
+                $this->addProductToRequest(
+                    $items,
+                    $variant->mallVariantId,
+                    $product->sku,
+                    $product->description,
+                    $product->name,
+                    $variant->price,
+                    $variant->inventory,
+                    $product->weight,
+                    $product->unlimited,
+                    $product->enabled,
+                    $product->categoryId,
+                    $variant->color,
+                    $varoant->size,
+                    $productId
+                );
             }
         }
 
@@ -132,8 +162,32 @@ class OzonService
         return $productId;
     }
 
-    protected function addProductToRequest($items, $dropshippVariantId, $sku, $description, $name, $price, $weight, $quantity, $unlimited, $enabled, $productId);
+    protected function addProductToRequest($items, $dropshippVariantId, $sku, $description, $name, $price, $weight, $quantity, $unlimited, $enabled, $categoryId, $color, $size, $productId);
     {
+        $ozonCategoryId = $this->getOzonCategory($categoryId);
+        $attributes = array([
+            'id' => config('app.ozon_product_group_attribute'),
+            'value' => $name . '(' . $sku . ')'
+        ]);
+        if (!is_null($color)) {
+            $colorAttributeId = $this->getAttribute($ozonCategoryId, $color);
+            if (!is_null($colorAttributeId)) {
+                appay_push($attributes, [
+                    'id' => $colorAttributeId,
+                    'value' => $color
+                ]);
+            }
+        }
+        if (!is_null($size)) {
+            $sizeAttributeId = $this->getAttribute($ozonCategoryId, $size);
+            if (!is_null($sizeAttributeId)) {
+                appay_push($attributes, [
+                    'id' => $sizeAttributeId,
+                    'value' => $size
+                ]);
+            }
+        }
+
         array_push($items, [
             'dropshippProductId' => $productId,
             'dropshippVariantId' => $dropshippVariantId,
@@ -141,7 +195,7 @@ class OzonService
             'description' => $description,
             'category_id' => config('app.active_category_id'),
             'name' => $name,
-            'offer_id' => $sku,
+            'offer_id' => $productId,
             'price' => strval($price),
             'vat'=> '0',
             'weight' => $weight,
@@ -151,10 +205,7 @@ class OzonService
                 'file_name' => 'https://ozon-st.cdn.ngenix.net/multimedia/c1200/1022555115.jpg',
                 'default' => true
             ]),
-            'attributes' => array([
-                'id' => config('app.ozon_product_group_attribute'),
-                'value' => $name . '(' . $sku . ')'
-            ]),
+            'attributes' => $attributes,
             "visibility_details": [
                 'has_price': true,
                 'has_stock': $unlimited,
@@ -163,6 +214,42 @@ class OzonService
         ]);
 
         return $items;
+    }
+
+    public function getOzonCategory($categoryId)
+    {
+        $ozonCategoryId = $this->classifyCategory($categoryId);
+        if (is_null($ozonCategoryId)) {
+            $result = app('db')->connection('mysql')->select('select top 1 oc.id as ozonCategoryId from ozonCategory oc
+                left join category c on c.ozonCategoryId = oc.id where c.id = \'' . $categoryId . '\'');
+            if (!is_null($result)) {
+                return $result->ozonCategoryId;
+            }
+            else return config('app.active_category_id');
+        }
+        else return $ozonCategoryId;
+    }
+
+    protected function classifyCategory($categoryId)
+    {
+        return null;
+    }
+
+    protected function getAttribute($ozonCategoryId, $attributeValue)
+    {
+        $result = app('db')->connection('mysql')->select('
+            select top 1 a.id as attributeId from ozonCategory oc
+                inner join category_attribute ca on oc.id = ca.categoryid
+                inner join attribute a on ca.attributeid = a.id
+                inner join attribute_value av on a.id = av.attributeid
+                where av.value =\'' . $value . '\'
+                    and oc.id = \'' . $ozonCategoryId .'\'
+        ');
+        if (!$result)  {
+            Log::error('Attribute with value ' . $attributeValue . 'doesn\'t exists!');
+            return null;
+        }  
+        return $result->attributeId;
     }
 
     protected function setQuantity($items)
@@ -706,7 +793,7 @@ class OzonService
 
 
 
-
+    
     ////Common
     protected sendData($url, $data)
     {
