@@ -36,7 +36,7 @@ class DropshippService
                 'newFulfillmentStatus' => $order->newStatus
             ]);
             $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->baseUrl . str_replace('store_num', $order->id, $this->orderUrl) . $tokenUrl);
+            curl_setopt($ch, CURLOPT_URL, $this->baseUrl . str_replace('{store_num}', $order->id, $this->orderUrl) . $tokenUrl);
             curl_setopt($ch, CURLOPT_HTTPHEADER, array(
                 'Content-Type: application/json',                                                                                
                 'Content-Length: ' . strlen($data_string))                                                                
@@ -54,7 +54,7 @@ class DropshippService
         Log::info('New orders:' . json_encode($orders));
         foreach ($orders as $key => $order) {
             $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->baseUrl . str_replace('store_num', $order->id, $this->orderUrl) . $tokenUrl);
+            curl_setopt($ch, CURLOPT_URL, $this->baseUrl . str_replace('{store_num}', $order->id, $this->orderUrl) . $tokenUrl);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             $response = curl_exec($ch);
             curl_close($ch);
@@ -67,7 +67,7 @@ class DropshippService
         Log::info('Deleted orders:' . json_encode($orders));
         foreach ($orders as $key => $order) {
             $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->baseUrl . str_replace('store_num', $order->id, $this->orderUrl) . $tokenUrl);
+            curl_setopt($ch, CURLOPT_URL, $this->baseUrl . str_replace('{store_num}', $order->id, $this->orderUrl) . $tokenUrl);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
             $response = curl_exec($ch);
