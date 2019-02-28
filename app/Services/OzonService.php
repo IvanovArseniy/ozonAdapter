@@ -25,15 +25,56 @@ class OzonService
     
     public function getProductFullInfo($productId)
     {
-        //Get mall items here and make response
-        return $this->getProductInfo($productId, 0);
+        $products = app('db')->connection('mysql')->table('product_variant')
+            ->select('ozon_product_id as ozonProductId', 'mall_variant_id as mallVariantId', 'name', 'description', 'image_url as imageUrl', 'color', 'size')
+            ->get();
+        $galleryImages = array();
+        $variants = array();
+        $name = null;
+        $mainImage = null;
+        if(!is_null($products))
+        {
+            foreach ($products as $key => $product) {
+                $response = $this->getProductFromOzon($product->ozonProductId);
+
+                $name = $response->result->name;
+                $imageResult = $this->getImages($response->result->images);
+                foreach ($imageResult as $key => $image) {
+                    if ($image->default) {
+                        $mainImage = $image->file_name;
+                    }
+                    else {
+                        array_push($galleryImages, [
+                            'id' => $image->id,
+                            'imageUrl' => $image->file_name
+                        ]);
+                    }
+                }
+
+                array_push($variants, [
+                    'mallVariantId' => $product->mallVariantId,
+                    'inventory' => $response->result->stock,
+                    'color': $product->color,
+                    'size' => $product->size,
+                    'price' => $response->result->price,
+                    'description' => $product->description
+                ]);
+            }
+        }
+        else return [
+            'Error' => 'Product with id=' . $productId . ' doesn\'t exists!';
+        ];
+
+        return [
+            'name' => $name,
+            'imageUrl' => $mainImage,
+            "galleryImages": $galleryImages,
+            'variants' => $variants
+        ];
     }
 
     public function getProductInfo($productId, $mallVariantId)
     {
-        if(is_null($mallVariantId)) {
-            $mallVariantId = 0;
-        }
         $ozonProductResult = $this->getOzonProductId($productId, $mallVariantId);
         if ($ozonProductResult->Success) {
 
@@ -87,8 +128,9 @@ class OzonService
     protected function createProduct($product, $productId)
     {
         $items = array();
+        $innerItems = array();
         foreach ($product->variants as $key => $variant) {
-            $this->addProductToRequest(
+            $items = $this->addProductToRequest(
                 $items,
                 $variant->mallVariantId,
                 $product->sku,
@@ -101,9 +143,16 @@ class OzonService
                 $product->enabled,
                 $product->categoryId,
                 $variant->color,
-                $varoant->size,
+                $variant->size,
                 $productId
             );
+            array_push($innerItems, [
+                'color' => $variant->color,
+                'size' => $variant->size,
+                'price' => $variant->price,
+                'description' => $product->description,
+                'name' => $product->name
+            ]);
         }
 
         $interactionId = com_create_guid();
@@ -117,10 +166,34 @@ class OzonService
         for ($i=0; $i < count($result->result); $i++) { 
             app('db')->connection('mysql')->table('product_variants')
                 ->insert([
-                    'ozon_prodct_id' => $result->result[i],
-                    'product_idd' => $items[i]->dropshippProductId,
-                    'mall_variant_id' => $items[i]->dropshippVariantId
+                    'ozon_product_id' => $result->result[i],
+                    'product_id' => $items[i]->dropshippProductId,
+                    'mall_variant_id' => $items[i]->mallVariantId,
+                    'name' => $innerItems[i]->name,
+                    'price' => $innerItems[i]->price,
+                    'description' => $innerItems[i]->description,
+                    'color' => $innerItems[i]->color,
+                    'size' => $innerItems[i]->size
                 ]);
+
+            foreach ($items[i]->attributes as $key => $attribute) {
+                if(!is_null($attribute->collection)) {
+                    foreach ($attribute->collection as $key => $value) {
+                        app('db')->connection('mysql')->table('product_attributes')
+                        ->insert([
+                            'ozon_product_id' => $result->result[i],
+                            'attribute_value_id' => $value
+                        ]);
+                    }
+                }
+                else {
+                    app('db')->connection('mysql')->table('product_attributes')
+                    ->insert([
+                        'ozon_product_id' => $result->result[i],
+                        'attribute_value_id' => $attribute->value
+                    ]);
+                }
+            }
 
             array_push($quantityItems, [
                 'product_id' => $result->result[i],
@@ -135,7 +208,7 @@ class OzonService
         return $productId;
     }
 
-    protected function addProductToRequest($items, $dropshippVariantId, $sku, $description, $name, $price, $weight, $quantity, $unlimited, $enabled, $categoryId, $color, $size, $productId);
+    protected function addProductToRequest($items, $mallVariantId, $sku, $description, $name, $price, $weight, $quantity, $unlimited, $enabled, $categoryId, $color, $size, $productId);
     {
         $ozonCategoryId = $this->getOzonCategory($categoryId);
         if(!is_null($ozonCategoryId)) {
@@ -161,7 +234,7 @@ class OzonService
             if ((is_null($color) || !is_null($colorAttribute->attributeId)) && (is_null($size) || !is_null($sizeAttribute->attributeId))) {
                 array_push($items, [
                     'dropshippProductId' => $productId,
-                    'dropshippVariantId' => $dropshippVariantId,
+                    'mallVariantId' => $mallVariantId,
                     'barcode' => strval($sku),
                     'description' => $description,
                     'category_id' => config('app.active_category_id'),
@@ -305,7 +378,7 @@ class OzonService
         if (!is_null($ozonProductResult->result)) {
             $result = $this->createProduct([
                 'dropshippProductId' => $productId,
-                'dropshippVariantId' => $combination->mallVariantId,
+                'mallVariantId' => $combination->mallVariantId,
                 'barcode' => $ozonProductResult->result->barcode,
                 'categiry_id' => $ozonProductResult->result->category_id,
                 'name' => $ozonProductResult->result->name,
@@ -325,7 +398,7 @@ class OzonService
         else return $ozonProductResult;
     }
 
-    protected function getOzonProductId($productId, $dropshippVariantId)
+    protected function getOzonProductId($productId, $mallVariantId)
     {
         $productVariant = app('db')->connection('mysql')->table('product_variants')
             ->where('deleted', 0)
@@ -596,11 +669,8 @@ class OzonService
                             'default' => $image->default
                         ]);
                     }
-
                 }
-    
             }
-
             return ['images' => $resultImages, 'imageIds' => $insertedImages];
         }
 
@@ -612,7 +682,7 @@ class OzonService
         $imageResult = app('db')->connection('mysql')
             ->select('select * from image where deleted = 0 and file_name IN (' . implode('\',\'', $imageFilenames) . ')');
         if ($imageResult) {
-            return $iamgeResult;
+            return $imageResult;
         }
         else return array();
     }
