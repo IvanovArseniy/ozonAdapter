@@ -37,6 +37,7 @@ class OzonService
         $variants = array();
         $name = null;
         $mainImage = null;
+        $description = null;
         if(!is_null($products))
         {
             foreach ($products as $key => $product) {
@@ -56,13 +57,13 @@ class OzonService
                     }
                 }
 
+                $description = $product->description;
                 array_push($variants, [
                     'mallVariantId' => $product->mallVariantId,
                     'inventory' => $response->result->stock,
                     'color': $product->color,
                     'size' => $product->size,
                     'price' => $response->result->price,
-                    'description' => $product->description
                 ]);
             }
         }
@@ -73,6 +74,7 @@ class OzonService
         return [
             'name' => $name,
             'imageUrl' => $mainImage,
+            'description' => $description,
             "galleryImages": $galleryImages,
             'variants' => $variants
         ];
@@ -776,6 +778,7 @@ class OzonService
         $updatedProducts = array();
         $result = app('db')->connaction('mysql')->select('
             select 
+                pv.id as id,
                 pv.product_id as productId,
                 pv.mall_variant_id as mallVariantId,
                 pv.ozon_product_id as ozonProductId,
@@ -791,14 +794,31 @@ class OzonService
 
             //Цена, наименование товара, описание, картинка
         if ($result) {
-            foreach ($result as $key => $product) {
-                if (!in_array($product->productId, $updatedProducts)) {
-                    array_push($updatedProducts, $product->productId);
-                    $response = $this->getProductFullInfo($product->productId);
-                    if (is_null($response->Error)) {
-                        foreach ($variable as $key => $value) {
-                            # code...
+            foreach ($result as $key => $productVariant) {
+                if (!in_array($productVariant->productId, $updatedProducts)) {
+                    array_push($updatedProducts, $productVariant->productId);
+                    $productInfo = $this->getProductFullInfo($productVariant->productId);
+
+                    $updateFields = ['update_date' => date('Y-m-d\TH:i:s.u')];
+                    foreach ($productInfo->variants as $key => $variant) {
+                        if (
+                            $variant->price != $productVariant->price
+                            || $productInfo->name != $productVariant->name
+                            || $productInfo->imageUrl != $productVariant->imageUrl
+                            ||) {
+                                $updateFields->price = $variant->price;
+                                $updateFields->name = $productInfo->name;
+                                if ($productInfo->imageUrl != $productVariant->imageUrl) {
+                                    app('db')->connection('mysql')->table('image')
+                                    ->where('deleted', 0)
+                                    ->where('product_variantId', $productVariant->id)
+                                    ->update(['image_url' => $productInfo->imageUrl]);
+                                }
                         }
+
+                        app('db')->connection('mysql')->table('product_variant')
+                            ->where('id', $productVariant->id)
+                            ->update($updateFields);
                     }
                 }
             }

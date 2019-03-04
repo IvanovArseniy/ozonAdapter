@@ -45,5 +45,7 @@ return [
         //'CANCELLED' => 'WILL_NOT_DELIVER',
         'CANCELLED' => 'RETURNED',
         'DELIVERED' => 'READY_FOR_PICKUP'
-    ]
+    ],
+
+    'sync_portion' => 100
 ];
