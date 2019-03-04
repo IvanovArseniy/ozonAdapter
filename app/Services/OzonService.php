@@ -26,9 +26,13 @@ class OzonService
     
     public function getProductFullInfo($productId)
     {
-        $products = app('db')->connection('mysql')->table('product_variant')
-            ->select('ozon_product_id as ozonProductId', 'mall_variant_id as mallVariantId', 'name', 'description', 'image_url as imageUrl', 'color', 'size')
-            ->get();
+        $products = app('db')->connection('mysql')->
+            select('
+                select pv.ozon_product_id as ozonProductId, pv.mall_variant_id as mallVariantId, pv.name, pv.description, i.image_url as imageUrl, pv.color, pv.size
+                    from product_variant pv
+                    left join image i on (i.product_variant_id = pv.id and i.default = 1)
+                    where pv.deleted = 0
+            ');
         $galleryImages = array();
         $variants = array();
         $name = null;
@@ -175,7 +179,8 @@ class OzonService
                     'price' => $innerItems[i]->price,
                     'description' => $innerItems[i]->description,
                     'color' => $innerItems[i]->color,
-                    'size' => $innerItems[i]->size
+                    'size' => $innerItems[i]->size,
+                    'deleted' => 0
                 ]);
 
             array_push($quantityItems, [
@@ -308,7 +313,7 @@ class OzonService
     {
         $result = app('db')->connection('mysql')->select('
             select top 1 a.id as attributeId, av.ozon_id as attributeValueId, a.is_collection as isCollection from ozon_category oc
-                inner join category_attribute ca on oc.id = ca.category_id
+                inner join ozon_category_attribute ca on oc.id = ca.ozon_category_id
                 inner join attribute a on ca.attribute_id = a.id
                 inner join attribute_value av on a.id = av.attribute_id
                 inner join attribute_value_map avm on av.id = avm.attribute_value_id
@@ -318,7 +323,7 @@ class OzonService
         if (!$result) {
             $result = app('db')->connection('mysql')->select('
                 select top 1 a.id as attributeId, av.ozon_id as attributeValueId, a.is_collection as isCollection from ozon_category oc
-                    inner join category_attribute ca on oc.id = ca.category_id
+                    inner join ozon_category_attribute ca on oc.id = ca.ozon_category_id
                     inner join attribute a on ca.attribute_id = a.id
                     inner join attribute_value av on a.id = av.attribute_id
                     where av.value =\'' . $value . '\'
@@ -385,7 +390,7 @@ class OzonService
     {
         $productVariant = app('db')->connection('mysql')->table('product_variants')
             ->where('deleted', 0)
-            ->where('dropshipp_id', $productId)
+            ->where('product_id', $productId)
             ->where('mall_variant_id', $drodshippVariantId)
             ->first();
         if ($productVariant) {
@@ -549,6 +554,7 @@ class OzonService
 
             if ($updateNeeded) {
                 app('db')->connection('mysql')->table('product_variant')
+                    ->where('deleted', 0)
                     ->where('product_id', $productId)
                     ->where('mall_variant_id', $mallVariantId)
                     ->update($updateFields);
@@ -599,7 +605,7 @@ class OzonService
     public function addMainImage($productId, $image)
     {
         $productVariants = app('db')->connection('mysql')
-            ->select('select ozon_product_id as ozonProductId, mall_variant_id as mallVariantId from product_variant where product_id=' . $productId);
+            ->select('select ozon_product_id as ozonProductId, mall_variant_id as mallVariantId from product_variant where deleted = 0 and product_id=' . $productId);
         if (!is_null($productVariants)) {
             foreach ($productVariants as $key => $variant) {
                 $result = $this->updateOzonProduct(['image' => array([
@@ -614,7 +620,7 @@ class OzonService
     public function addGalleryImage($image, $productId)
     {
         $productVariants = app('db')->connection('mysql')
-            ->select('select ozon_product_id as ozonProductId, mall_variant_id as mallVariantId from product_variant where product_id=' . $productId);
+            ->select('select ozon_product_id as ozonProductId, mall_variant_id as mallVariantId from product_variant where deleted = 0 and product_id=' . $productId);
         if (!is_null($productVariants)) {
             foreach ($productVariants as $key => $variant) {
                 $result = $this->updateOzonProduct(['image' => array([
@@ -638,7 +644,7 @@ class OzonService
     public function deleteGalleryImage($imageId, $productId)
     {
         $productVariants = app('db')->connection('mysql')
-            ->select('select ozon_product_id as ozonProductId, mall_variant_id as mallVariantId from product_variant where product_id=' . $productId);
+            ->select('select ozon_product_id as ozonProductId, mall_variant_id as mallVariantId from product_variant where deleted = 0 and product_id =' . $productId);
         if (!is_null($productVariants)) {
             foreach ($productVariants as $key => $variant) {
                 $ozonProductInfo = $this->getProductInfo($productId, $variant->mallVariantId);
@@ -769,18 +775,20 @@ class OzonService
     {
         $updatedProducts = array();
         $result = app('db')->connaction('mysql')->select('
-            select top ' . config(app.sync_portion) . '
-                    pv.product_id as productId,
-                    pv.mall_variant_id as mallVariantId,
-                    pv.ozon_product_id as ozonProductId,
-                    pv.name as name,
-                    pv.description as description,
-                    pv.price as price,
-                    pv.image_url as imageUrl
-                from product p
-                inner join product_variant pv on p.id = pv.product_id
-                order by p.update_date asc
-            ');
+            select 
+                pv.product_id as productId,
+                pv.mall_variant_id as mallVariantId,
+                pv.ozon_product_id as ozonProductId,
+                p.name as name,
+                p.description as description,
+                pv.price as price,
+                i.image_url as imageUrl
+            from product p
+            inner join product_variant pv on p.id = pv.product_id
+            left join image i on (i.product_variant_id = pv.id and i.default = 1)
+            where product_id in (select top ' . config(app.sync_portion) . ' id from product order by p.update_date asc)
+        ');
+
             //Цена, наименование товара, описание, картинка
         if ($result) {
             foreach ($result as $key => $product) {
@@ -869,6 +877,7 @@ class OzonService
         $interactionId = com_create_guid();
 
         $orderResult = app('db')->connection('mysql')->table('order')
+            ->where('deleted', 0)
             ->where('id', $orderId)->first();
         if (!$orderResult)  {
             Log::error('Order with Id ' . $orderId . 'doesn\'t exists!');
@@ -887,6 +896,7 @@ class OzonService
             $fullItems = array();
             foreach ($order->result->items as $key => $item) {
                 $product = app('db')->connection('mysql')->table('product_variant')
+                    ->where('deleted', 0)    
                     ->where('ozon_product_id', $item->product_id)->first();
                 $productResponse = $this->getProductFromOzon($item->product_id);
                 $product = json_decode($productResponse, true);
@@ -1019,7 +1029,7 @@ class OzonService
                 $categoryResult = app('db')->connection('mysql') ->table('ozon_category')
                     ->insert([
                         'id' => $category->category_id,
-                        'title' => $category->title
+                        'name' => $category->title
                     ]);
                 if ($categoryResult) {
                     $response = $this->sendData(str_replace('{category_id}', $category->category_id, $this->categoryAttributeListUrl));
@@ -1034,16 +1044,16 @@ class OzonService
                                 ]);
                             }
                             if ($attributeResult)  {
-                                app('db')->connection('mysql')->table('category_attribute')
+                                app('db')->connection('mysql')->table('ozon_category_attribute')
                                     ->insert([
                                         'attribute_id' => $attribute->id,
-                                        'category_id' = $category->category_id
+                                        'ozon_category_id' = $category->category_id
                                     ]);
                                 foreach ($attribute->option as $key => $option) {
                                     app('db')->connection('mysql')->table('attribute_value')
                                         ->insert([
                                             'attribute_id' => $attribute->id,
-                                            'id' => $option->id,
+                                            'ozon_id' => $option->id,
                                             'value' => $option->value
                                         ]);
                                 }
