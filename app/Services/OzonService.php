@@ -2,6 +2,7 @@
 
 namespace App\Services;
 use Log;
+use App\Services\DropshippService;
 
 class OzonService
 {
@@ -165,7 +166,7 @@ class OzonService
         $productId = 0;
         $quantityItems = array();
         for ($i=0; $i < count($result->result); $i++) { 
-            app('db')->connection('mysql')->table('product_variants')
+            app('db')->connection('mysql')->table('product_variant')
                 ->insert([
                     'ozon_product_id' => $result->result[i],
                     'product_id' => $items[i]->dropshippProductId,
@@ -176,25 +177,6 @@ class OzonService
                     'color' => $innerItems[i]->color,
                     'size' => $innerItems[i]->size
                 ]);
-
-            foreach ($items[i]->attributes as $key => $attribute) {
-                if(!is_null($attribute->collection)) {
-                    foreach ($attribute->collection as $key => $value) {
-                        app('db')->connection('mysql')->table('product_attributes')
-                        ->insert([
-                            'ozon_product_id' => $result->result[i],
-                            'attribute_value_id' => $value
-                        ]);
-                    }
-                }
-                else {
-                    app('db')->connection('mysql')->table('product_attributes')
-                    ->insert([
-                        'ozon_product_id' => $result->result[i],
-                        'attribute_value_id' => $attribute->value
-                    ]);
-                }
-            }
 
             array_push($quantityItems, [
                 'product_id' => $result->result[i],
@@ -589,11 +571,11 @@ class OzonService
     public function deleteProduct($productId)
     {
         $products = app('db')->connection('mysql')
-            ->select('select * from product_variants where deleted = 0 and product_id = ' . $productId);
+            ->select('select * from product_variant where deleted = 0 and product_id = ' . $productId);
         foreach ($products as $key => $product) {
             $this->deactivateProduct($product->getOzonProductId);
         }
-        app('db')->connection('mysql')->table('product_variants')
+        app('db')->connection('mysql')->table('product_variant')
             ->where('product_id', $productId)->update(['deleted' => 1]);        
         return $ozonProductResult;
     }
@@ -783,15 +765,35 @@ class OzonService
 
 
     ////ScheduledProductUpdate
-    public function syncProducts()
+    public function syncProducts($dropshippService)
     {
+        $updatedProducts = array();
         $result = app('db')->connaction('mysql')->select('
-            select * from product p
+            select top ' . config(app.sync_portion) . '
+                    pv.product_id as productId,
+                    pv.mall_variant_id as mallVariantId,
+                    pv.ozon_product_id as ozonProductId,
+                    pv.name as name,
+                    pv.description as description,
+                    pv.price as price,
+                    pv.image_url as imageUrl
+                from product p
                 inner join product_variant pv on p.id = pv.product_id
-                order by update_date 
+                order by p.update_date asc
             ');
+            //Цена, наименование товара, описание, картинка
         if ($result) {
-
+            foreach ($result as $key => $product) {
+                if (!in_array($product->productId, $updatedProducts)) {
+                    array_push($updatedProducts, $product->productId);
+                    $response = $this->getProductFullInfo($product->productId);
+                    if (is_null($response->Error)) {
+                        foreach ($variable as $key => $value) {
+                            # code...
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -1032,7 +1034,7 @@ class OzonService
                                 ]);
                             }
                             if ($attributeResult)  {
-                                app('db')->connection('mysql')->table('attribute_category')
+                                app('db')->connection('mysql')->table('category_attribute')
                                     ->insert([
                                         'attribute_id' => $attribute->id,
                                         'category_id' = $category->category_id
