@@ -9,30 +9,37 @@ use App\Services\OzonService;
 
 class ProductController extends BaseController
 {
-    //public function getProductList()
     public function getProductInfo(OzonService $ozonService, Request $request)
     {
-        Log::info('Get product info:'. $request->input('productId'));
-        $result = $ozonService->getProductFullInfo($request->input('productId'));
-        Log::info('Get product info response:'. json_encode($result['result']));
-        return response()->json($result['result']);
+        Log::info('Get product info:'. json_encode($request->route('productId')));
+        $result = $ozonService->getProductFullInfo($request->route('productId'));
+        Log::info('Get product info response:'. json_encode($result));
+        return response()->json($result);
     }
 
     public function createProduct(OzonService $ozonService, Request $request)
     {
-        $product = json_decode($request->getContent());
+        $product = json_decode($request->getContent(), true);
         Log::info('Create product:'. json_encode($request->getContent()));
-        $productId = $ozonService->createNewProduct($product);
-        Log::info('Create product response:'. json_encode(['id' => $productId]));
-        return response()->json(['id' => $productId]);
+        if (!is_null($product) && !isset($product['name']) && isset($product['variants']) && count($product['variants']) > 0) {
+            $result = $ozonService->createNewProduct($product);
+            Log::info('Create product response:'. json_encode($result));
+            return response()->json($result);
+        }
+        else {
+            //return response()->json(['Error' => 'Required fields are not present!']);
+            $result = $ozonService->createNewProduct($product);
+            Log::info('Create product response:'. json_encode($result));
+            return response()->json($result);
+        }
     }
 
     public function createProductCombination(OzonService $ozonService, Request $request)
     {
         $productId = $request->input('productId');
-        $combination = json_decode($request->getContent());
+        $combinations = json_decode($request->getContent());
         Log::info('Create product combination:'. json_encode($request->getContent()));
-        $result = $ozonService->createProductCombination($productId, $combination);
+        $result = $ozonService->createProductCombination($productId, $combinations);
         Log::info('Create product combination response:'. json_encode(['id' => $productId]));
         return response()->json($result);
     }
@@ -82,7 +89,7 @@ class ProductController extends BaseController
         $imageId = $request->input('imageId');
         Log::info('Delete gallery image:'. $imageId);
         $result = $ozonService->deleteGalleryImage($imageId, $productId);
-        Log::info('Delete gallery image response:'. json_encode($result);
+        Log::info('Delete gallery image response:'. json_encode($result));
         return response()->json($result);
     }
 

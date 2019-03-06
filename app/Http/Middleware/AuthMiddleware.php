@@ -10,12 +10,12 @@ class AuthMiddleware
 
     public function __construct()
     {
-        $this->authToken = 'test';
+        $this->authToken = 'token_b569150ba79f4d1b81c00443d';
     }
 
     public function handle($request, Closure $next)
     {
-        if ($request->get('token') && $request->get('token') == $this->authToken) {
+        if ($request->input('token') && $request->input('token') == $this->authToken) {
             return $next($request);
         }
         return response('Unauthorized', 401);
