@@ -31,7 +31,7 @@ $router->group(['prefix' => '1/products', 'middleware' => 'auth'], function() us
 
     $router->post('/{productId}/image', 'ProductController@addMainImage');
     $router->post('/{productId}/gallery', 'ProductController@addGalleryImage');
-    $router->delete('/{productId/gallery/{imageId}', 'ProductController@deleteGalleryImage');
+    $router->delete('/{productId}/gallery/{imageId}', 'ProductController@deleteGalleryImage');
     $router->post('/{productId}/combinations/{combinationId}/image', 'ProductController@addGalleryImageForCombination');
 });
 

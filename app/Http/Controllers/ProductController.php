@@ -9,10 +9,10 @@ use App\Services\OzonService;
 
 class ProductController extends BaseController
 {
-    public function getProductInfo(OzonService $ozonService, Request $request)
+    public function getProductInfo(OzonService $ozonService, Request $request, $productId)
     {
-        Log::info('Get product info:'. json_encode($request->route('productId')));
-        $result = $ozonService->getProductFullInfo($request->route('productId'));
+        Log::info('Get product info:'. json_encode($productId));
+        $result = $ozonService->getProductFullInfo($productId);
         Log::info('Get product info response:'. json_encode($result));
         return response()->json($result);
     }
@@ -49,18 +49,18 @@ class ProductController extends BaseController
         $productId = $request->input('productId');
         $product = json_decode($request->getContent());
         Log::info('Update product:'. json_encode($request->getContent()));
-        $productId = $ozonService->updateProduct($product, $productId);
-        Log::info('Update product response:'. json_encode(['id' => $productId]));
-        return response()->json(['id' => $productId]);
+        $result = $ozonService->updateProduct($product, $productId);
+        Log::info('Update product response:'. json_encode($result));
+        return response()->json($result);
     }
 
     public function deleteProduct(OzonService $ozonService, Request $request)
     {
         $productId = $request->input('productId');
         Log::info('Delete product:'. json_encode($request->getContent()));
-        $productId = $ozonService->deleteProduct($productId);
-        Log::info('Delete product response:'. json_encode(['id' => $productId]));
-        return response()->json(['id' => $productId]);
+        $result = $ozonService->deleteProduct($productId);
+        Log::info('Delete product response:'. json_encode($result));
+        return response()->json($result);
     }
 
     public function addMainImage(OzonService $ozonService, Request $request)
@@ -69,8 +69,8 @@ class ProductController extends BaseController
         $image = json_decode($request->getContent());
         Log::info('Add main image:'. json_encode($request->getContent()));
         $imageIds = $ozonService->addMainImage($productId, $image);
-        Log::info('Add main image response:'. json_encode(['id' => $imageIds[0]]));
-        return response()->json(['id' => $imageIds[0]]);
+        Log::info('Add main image response:'. json_encode($imageIds));
+        return response()->json($imageIds);
     }
 
     public function addGalleryImage(OzonService $ozonService, Request $request)
@@ -78,9 +78,9 @@ class ProductController extends BaseController
         $productId = $request->input('productId');
         $image = json_decode($request->getContent());
         Log::info('Add gallery image:'. json_encode($request->getContent()));
-        $imageIds = $ozonService->addGalleryImage($image, $productId);
-        Log::info('Add gallery image response:'. json_encode(['id' => $imageIds[0]]));
-        return response()->json(['id' => $imageIds[0]]);
+        $imageIds = $ozonService->addGalleryImage($productId, $image);
+        Log::info('Add gallery image response:'. json_encode($imageIds));
+        return response()->json($imageIds);
     }
 
     public function deleteGalleryImage(OzonService $ozonService, Request $request)
@@ -99,8 +99,8 @@ class ProductController extends BaseController
         $mallVariantId = $request->input('combinationId');
         $image = json_decode($request->getContent());
         Log::info('Add gallery image for combination:'. json_encode($request->getContent()));
-        $imageIds = $ozonService->addGalleryImageForCombination($image, $productId, $mallVariantId);
-        Log::info('Add gallery image for combunation response:'. json_encode(['id' => $imageIds[0]]));
-        return response()->json(['id' => $imageIds[0]]);
+        $imageIds = $ozonService->addGalleryImageForCombination($productId, $mallVariantId, $image);
+        Log::info('Add gallery image for combunation response:'. json_encode($imageIds));
+        return response()->json($imageIds);
     }
 }

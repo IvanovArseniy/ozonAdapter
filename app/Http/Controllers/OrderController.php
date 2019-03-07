@@ -10,11 +10,11 @@ use App\Services\DropshippService;
 
 class OrderController extends BaseController
 {
-    public function getOrderInfo(OzonService $ozonService, Request $request)
+    public function getOrderInfo(OzonService $ozonService, Request $request, $orderId)
     {
-        Log::info('Get order info:'. $request->input('orderId'));
-        $result = $ozonService->getOrderInfo($request->input('orderId'));
-        Log::info('Get order info result:'. json_encode($result);
+        Log::info('Get order info:'. $orderId);
+        $result = $ozonService->getOrderInfo($orderId);
+        Log::info('Get order info result:'. json_encode($result));
         return response()->json($result);
     }
 
@@ -22,7 +22,7 @@ class OrderController extends BaseController
     {
         Log::info('Set order status:'. $request->input('orderId'));
         $result = $ozonService->setOrderStatus($request->input('orderId'), $request->getContent());
-        Log::info('Set order status result:'. json_encode($result);
+        Log::info('Set order status result:'. json_encode($result));
         return response()->json($result);
     }
 
