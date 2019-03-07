@@ -1130,20 +1130,20 @@ class OzonService
                                         'is_collection' => $attribute['is_collection'],
                                         'required' => $attribute['required']
                                     ]);
-                            }
-                            if ($attributeResult)  {
-                                app('db')->connection('mysql')->table('ozon_category_attribute')
-                                    ->insert([
-                                        'attribute_id' => $attribute['id'],
-                                        'ozon_category_id' => $category['category_id']
-                                    ]);
-                                foreach ($attribute['option'] as $key => $option) {
-                                    app('db')->connection('mysql')->table('attribute_value')
+                                if ($attributeResult)  {
+                                    app('db')->connection('mysql')->table('ozon_category_attribute')
                                         ->insert([
                                             'attribute_id' => $attribute['id'],
-                                            'ozon_id' => $option['id'],
-                                            'value' => $option['value']
+                                            'ozon_category_id' => $category['category_id']
                                         ]);
+                                    foreach ($attribute['option'] as $key => $option) {
+                                        app('db')->connection('mysql')->table('attribute_value')
+                                            ->insert([
+                                                'attribute_id' => $attribute['id'],
+                                                'ozon_id' => $option['id'],
+                                                'value' => $option['value']
+                                            ]);
+                                    }
                                 }
                             }
                         }
