@@ -1111,11 +1111,15 @@ class OzonService
             ]));
             Log::info('Category inserted: ' . $category['category_id'] . ' ' . $category['title']);
             if(is_null($category['children'])) {
-                $categoryResult = app('db')->connection('mysql') ->table('ozon_category')
+                try {
+                    $categoryResult = app('db')->connection('mysql') ->table('ozon_category')
                     ->insert([
                         'id' => $category['category_id'],
                         'name' => $category['title']
                     ]);
+                } catch (\Exception $e) {
+                    $categoryResult = true;
+                }
                 if ($categoryResult) {
                     $response = $this->sendData(str_replace('{category_id}', $category['category_id'], $this->categoryAttributeListUrl), null);
                     $result = json_decode($response, true);
@@ -1124,25 +1128,40 @@ class OzonService
                             array_push($this->attributes, $attribute['id']);
                             Log::info('Attribute inserted: ' . $attribute['id']);
                             if($attribute['type'] == 'option') {
-                                $attributeResult = app('db')->connection('mysql')->table('attribute')
-                                    ->insert([
-                                        'id' => $attribute['id'],
-                                        'is_collection' => $attribute['is_collection'],
-                                        'required' => $attribute['required']
-                                    ]);
+                                try {
+                                    $attributeResult = app('db')->connection('mysql')->table('attribute')
+                                        ->insert([
+                                            'id' => $attribute['id'],
+                                            'is_collection' => $attribute['is_collection'],
+                                            'required' => $attribute['required']
+                                        ]);
+                                }
+                                catch (\Exception $e) {
+                                    $attributeResult = true;
+                                }
                                 if ($attributeResult)  {
-                                    app('db')->connection('mysql')->table('ozon_category_attribute')
+                                    try {
+                                        app('db')->connection('mysql')->table('ozon_category_attribute')
                                         ->insert([
                                             'attribute_id' => $attribute['id'],
                                             'ozon_category_id' => $category['category_id']
                                         ]);
+                                    }
+                                    catch (\Exception $e) {
+                                        $attributeResult = true;
+                                    }
                                     foreach ($attribute['option'] as $key => $option) {
-                                        app('db')->connection('mysql')->table('attribute_value')
+                                        try {
+                                            app('db')->connection('mysql')->table('attribute_value')
                                             ->insert([
                                                 'attribute_id' => $attribute['id'],
                                                 'ozon_id' => $option['id'],
                                                 'value' => $option['value']
                                             ]);
+                                        }
+                                        catch (\Exception $e) {
+                                            $attributeResult = true;
+                                        }
                                     }
                                 }
                             }
