@@ -46,4 +46,5 @@ $router->group(['prefix' => '1/categories', 'middleware' => 'auth'], function() 
     $router->get('/', 'CategoryController@getCategoryList');
     $router->post('/', 'CategoryController@addCategory');
     $router->put('/{categoryId}', 'CategoryController@updateCategoryName');
+    $router->post('/insert', 'CategoryController@uploadCategories');
 });

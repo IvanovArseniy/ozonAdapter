@@ -21,23 +21,19 @@ class ProductController extends BaseController
     {
         $product = json_decode($request->getContent(), true);
         Log::info('Create product:'. json_encode($request->getContent()));
-        if (!is_null($product) && !isset($product['name']) && isset($product['variants']) && count($product['variants']) > 0) {
+        if (!is_null($product) && isset($product['name']) && isset($product['variants']) && count($product['variants']) > 0) {
             $result = $ozonService->createNewProduct($product);
             Log::info('Create product response:'. json_encode($result));
             return response()->json($result);
         }
         else {
-            //return response()->json(['Error' => 'Required fields are not present!']);
-            $result = $ozonService->createNewProduct($product);
-            Log::info('Create product response:'. json_encode($result));
-            return response()->json($result);
+            return response()->json(['Error' => 'Required fields are not present!']);
         }
     }
 
-    public function createProductCombination(OzonService $ozonService, Request $request)
+    public function createProductCombination(OzonService $ozonService, Request $request, $productId)
     {
-        $productId = $request->input('productId');
-        $combinations = json_decode($request->getContent());
+        $combinations = json_decode($request->getContent(), true);
         Log::info('Create product combination:'. json_encode($request->getContent()));
         $result = $ozonService->createProductCombination($productId, $combinations);
         Log::info('Create product combination response:'. json_encode(['id' => $productId]));

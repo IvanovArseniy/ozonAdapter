@@ -1,18 +1,20 @@
 <?php
 
 return [
-    'ozon_api_client_id' => '466',
-    'ozon_api_key' => '9753260e-2324-fde7-97f1-7848ed7ed097',
+    'ozon_api_client_id' => '3639',
+    'ozon_api_key' => '4e1938c1-671d-40cd-ab4b-dada9fa16159',
 
-    'ozon_base_url' => 'http://cb-api.test.ozon.ru',
+    'ozon_base_url' => 'https://api-seller.ozon.ru',
     'ozon_productinfo_url' => '/v1/product/info',
-    'ozon_createrproduct_url' => '/v1/product/import',
+    'ozon_importproduct_url' => '/v1/product/import',
+    'ozon_createproduct_url' => '/v1/products/create',
     'ozon_update_stocks_url' => '/v1/products/stocks',
     'ozon_updateproduct_url' => '/v1/products/update',
     'deactivate_product_url' => '/v1/products/activate',
     'activate_product_url' => '/v1/products/deactivate',
     'update_productprices_url' => '/v1/products/prices',
     'ozon_product_group_attribute' => 8292,
+    'product_import' => true,
 
     'ozon_orderlist_url' => '/v1/order/list',
     'ozon_orderinfo_url' => '/v1/order/{orderId}?translit=true',

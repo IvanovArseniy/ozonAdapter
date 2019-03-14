@@ -10,6 +10,7 @@ class OzonService
 
     protected $productInfoUrl;
     protected $createProductsUrl;
+    protected $importProductsUrl;
     protected $updateStocksUrl;
     protected $updateProductUrl;
     protected $activateProductUrl;
@@ -30,7 +31,8 @@ class OzonService
         $this->baseUrl = config('app.ozon_base_url');
 
         $this->productInfoUrl = config('app.ozon_productinfo_url');
-        $this->createProductsUrl = config('app.ozon_createrpoduct_url');
+        $this->createProductsUrl = config('app.ozon_createproduct_url');
+        $this->importProductsUrl = config('app.ozon_importproduct_url');
         $this->updateStocksUrl = config('app.ozon_update_stocks_url');
         $this->updateProductUrl = config('app.ozon_updateproduct_url');
         $this->activateProductUrl = config('app.activate_product_url');
@@ -109,13 +111,13 @@ class OzonService
     {
         $ozonProductResult = $this->getOzonProductId($productId, $mallVariantId);
         if ($ozonProductResult['Success']) {
-            $response = $this->getProductFromOzon($ozonProductResult->ozonProductId);
+            $response = $this->getProductFromOzon($ozonProductResult['ozonProductId']);
             $result = json_decode($response, true);
-            $result->result->productVariant = [
-                'id' => $ozonProductResult->id,
-                'mallVariantId' => $ozonProductResult->mallVariantId,
-                'productId' => $ozonProductResult->productId,
-                'ozonProductId' => $ozonProductResult->ozonProductId
+            $result['result']['productVariant'] = [
+                'id' => $ozonProductResult['id'],
+                'mallVariantId' => $ozonProductResult['mallVariantId'],
+                'productId' => $ozonProductResult['productId'],
+                'ozonProductId' => $ozonProductResult['ozonProductId']
             ];
             return $result;
         }
@@ -134,13 +136,15 @@ class OzonService
     public function createNewProduct($product)
     {
         $productId = 0;
+        //TODO:dubles
         $pdo = app('db')->connection('mysql')->getPdo();
         $result = app('db')->connection('mysql')->table('product')
             ->insert([
                 'name' => $product['name'],
                 'sku' => $product['sku'],
                 'enabled' => $product['enabled'],
-                'update_date' => date('Y-m-d\TH:i:s.u')
+                'update_date' => date('Y-m-d\TH:i:s.u'),
+                'description' => $product['description']
             ]);
         if ($result) {
             $productId = $pdo->lastInsertId();
@@ -170,7 +174,7 @@ class OzonService
                 $variant['price'],
                 $variant['inventory'],
                 $product['weight'],
-                $product['unlimited'],
+                !$product['unlimited'],
                 $product['enabled'],
                 $product['categoryIds'],
                 $variant['color'],
@@ -182,7 +186,7 @@ class OzonService
                 array_push($items, $item);
             }
             else {
-                array_push($errors, $item);
+                array_push($errors, $item['error']);
             }
             array_push($innerItems, [
                 'color' => $variant['color'],
@@ -193,45 +197,64 @@ class OzonService
             ]);
         }
 
-        $interactionId = mt_srand();
-        Log::info($interactionId . ' => Create product request to ozon:' . json_encode(['items' => $items]));
-        $response = $this->sendData($this->createProductsUrl, ['items' => $items]);
-        Log::info($interactionId . ' => Create ozon products: ' . $response);
-        $result = json_decode($response);
+        $result = $this->sendProductsToOzon($items);
 
         $productId = null;
         $quantityItems = array();
 
-        if (!$result->error) {
-            for ($i=0; $i < count($result->result); $i++) { 
+        if (!isset($result['error'])) {
+            for ($i=0; $i < count($result['result']); $i++) { 
                 app('db')->connection('mysql')->table('product_variant')
                     ->insert([
-                        'ozon_product_id' => $result->result[i],
-                        'product_id' => $items[i]->dropshippProductId,
-                        'mall_variant_id' => $items[i]->mallVariantId,
-                        'name' => $innerItems[i]->name,
-                        'price' => $innerItems[i]->price,
-                        'description' => $innerItems[i]->description,
-                        'color' => $innerItems[i]->color,
-                        'size' => $innerItems[i]->size,
+                        'ozon_product_id' => $result['result'][$i],
+                        'product_id' => $items[$i]['dropshippProductId'],
+                        'mall_variant_id' => $items[$i]['mallVariantId'],
+                        'price' => $innerItems[$i]['price'],
+                        'color' => $innerItems[$i]['color'],
+                        'size' => $innerItems[$i]['size'],
                         'deleted' => 0
                     ]);
 
                 array_push($quantityItems, [
-                    'product_id' => $result->result[i],
-                    'stock' => $items[i]->quantity
+                    'product_id' => $result['result'][$i],
+                    'stock' => $items[$i]['quantity']
                 ]);
 
-                $productId = $items[i]->productId;
+                $productId = $items[$i]['dropshippProductId'];
             }
 
             $this->setQuantity($quantityItems);
+        }
+        else {
+            array_push($errors, $result['error']);
         }
 
         return [
             'id' => $productId,
             'errors' => $errors
         ];
+    }
+
+    protected function sendProductsToOzon($items) {
+        if(config('app.product_import')) {
+            $interactionId = mt_srand();
+            Log::info($interactionId . ' => Import product request to ozon:' . json_encode(['items' => $items]));
+            $response = $this->sendData($this->importProductsUrl, ['items' => $items]);
+            Log::info($interactionId . ' => Import ozon products: ' . $response);
+            $result = json_decode($response, true);
+            $result = ['result' => [6974580]];
+        }
+        else {
+            $result = array();
+            foreach ($items as $key => $item) {
+                $interactionId = mt_srand();
+                Log::info($interactionId . ' => Create product request to ozon:' . json_encode($item));
+                $response = $this->sendData($this->createProductsUrl, $item);
+                Log::info($interactionId . ' => Create ozon products: ' . $response);
+                array_push($result, json_decode($response));
+            }
+        }
+        return $result;
     }
 
     protected function addProductToRequest($mallVariantId, $sku, $description, $name, $price, $weight, $quantity, $unlimited, $enabled, $categoryIds, $color, $size, $productId)
@@ -246,14 +269,14 @@ class OzonService
             if (!is_null($color)) {
                 $colorAttribute = $this->getAttribute($ozonCategoryId, $color);
                 if (isset($colorAttribute['attributeId'])) {
-                    $this->AddAttributeToRequest($attributes, $colorAttribute);
+                    $attributes = $this->AddAttributeToRequest($attributes, $colorAttribute);
                 }
             }
             $sizeAttribute = null;
             if (!is_null($size)) {
                 $sizeAttribute = $this->getAttribute($ozonCategoryId, $size);
                 if (isset($sizeAttribute['attributeId'])) {
-                    $this->AddAttributeToRequest($attributes, $sizeAttribute);
+                    $attributes = $this->AddAttributeToRequest($attributes, $sizeAttribute);
                 }
             }
 
@@ -263,7 +286,7 @@ class OzonService
                     'mallVariantId' => $mallVariantId,
                     'barcode' => strval($sku),
                     'description' => $description,
-                    'category_id' => config('app.active_category_id'),
+                    'category_id' => $ozonCategoryId,
                     'name' => $name,
                     'offer_id' => $productId,
                     'price' => strval($price),
@@ -300,22 +323,22 @@ class OzonService
         }
         else return [
             'success' => false,
-            'error' => 'Category with Id ' . $categoryId . ' doesn\'t exists! Try to update category table manually.'
+            'error' => 'Categories ' . json_encode($categoryIds) . ' doesn\'t exists! Try to update category table manually.'
         ];
     }
 
     protected function AddAttributeToRequest($attributes, $attribute)
     {
-        if ($attribute->isCollection) {
+        if ($attribute['isCollection']) {
             array_push($attributes, [
-                'id' => $colorAttribute->attributeId,
-                'collection' => array($colorAttribute->attributeValueId)
+                'id' => $attribute['attributeId'],
+                'collection' => array(strval($attribute['attributeValueId']))
             ]);
         }
         else {
             array_push($attributes, [
-                'id' => $colorAttribute->attributeId,
-                'value' => $colorAttribute->attributeValueId
+                'id' => $attribute['attributeId'],
+                'value' => strval($attribute['attributeValueId'])
             ]);
         }
 
@@ -330,17 +353,24 @@ class OzonService
             if (is_null($ozonCategoryId)) {
                 $result = app('db')->connection('mysql')->select('select oc.id as ozonCategoryId from ozon_category oc
                     left join category c on c.ozon_category_id = oc.id where c.id = \'' . $categoryId . '\' limit 1');
-                if (!is_null($result) && isset($result['ozonCategoryId'])) {
-                    $ozonCategoryId = $result->ozonCategoryId;
+                if (!is_null($result) && isset($result[0]->ozonCategoryId)) {
+                    $ozonCategoryId = $result[0]->ozonCategoryId;
                 }
                 else {
-                    app('db')->connection('mysql')->table('category')
-                        ->insert(['id' => $categoryId]);
+                    try {
+                        app('db')->connection('mysql')->table('category')
+                            ->insert(['id' => $categoryId]);
+                        Log::error('Category with id=' . $categoryId . ' does not mapped!');
+                    }
+                    catch (\Exception $e) {
+                        Log::info('Category ' . $categoryId . ' already exists');
+                    }
                 }
             }
         }
         if (is_null($ozonCategoryId)) {
-            return config('app.active_category_id');
+            //return config('app.active_category_id');\
+            return null;
         }
         else return $ozonCategoryId;
     }
@@ -389,15 +419,16 @@ class OzonService
             }
         }  
         return [
-            'attributeId' => $result->attributeId,
-            'attributeValueId' => $result->attributeValueId
+            'attributeId' => $result[0]->attributeId,
+            'attributeValueId' => $result[0]->attributeValueId,
+            'isCollection' => $result[0]->isCollection
         ];
     }
 
     protected function setQuantity($items)
     {
         $interactionId = mt_srand();
-        Log::info($interactionId . ' => Update stocks request to ozon:', json_encode(['stocks' => $items]));
+        Log::info($interactionId . ' => Update stocks request to ozon:' . json_encode(['stocks' => $items]));
         $response = $this->sendData($this->updateStocksUrl, ['stocks' => $items]);
         Log::info($interactionId . ' => Update stocks response: ' . $response);
         $result = json_decode($response, true);
@@ -408,15 +439,22 @@ class OzonService
         $product = app('db')->connection('mysql')->table('product')
             ->where('id', $productId)->first();
         if (!is_null($product)) {
-            $result = $this->createProduct([
-                'sku' => $product->sku,
-                'name' => $product->name,
-                'description' => $product->description,
-                'variannts' => $combinations
-            ]);
-            return $result;
+            $productVariants = $this->getProductVariants($productId);
+            if (!is_null($productVariants) && count($productVariants) > 0) {
+                $ozonProductInfo = $this->getProductInfo($productId, $productVariants[0]->mallVariantId);
+                Log::info('*****' . json_encode());
+                $result = $this->createProduct([
+                    'sku' => $product->sku,
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'variants' => $combinations
+                ], $productId);
+                return $result;
+            }
         }
-        else return array();
+        return [
+            'Error' => 'Product not found'
+        ];
     }
 
     protected function getOzonProductId($productId, $mallVariantId)
@@ -427,6 +465,7 @@ class OzonService
             ->where('mall_variant_id', $mallVariantId)
             ->first();
             
+        Log::info('****' . json_encode($productVariant));
         if ($productVariant) {
             return [
                 'Success' => true,
@@ -536,7 +575,7 @@ class OzonService
                 if (!is_null($color)) {
                     $colorAttribute = $this->getAttribute($ozonCategoryId, $color);
                     if (!is_null($colorAttribute->attributeId)) {
-                        $this->AddAttributeToRequest($attributes, $colorAttribute);
+                        $attributes = $this->AddAttributeToRequest($attributes, $colorAttribute);
                     }
                 }
             }
@@ -545,7 +584,7 @@ class OzonService
                 if (!is_null($size)) {
                     $sizeAttribute = $this->getAttribute($ozonCategoryId, $size);
                     if (!is_null($sizeAttribute->attributeId)) {
-                        $this->AddAttributeToRequest($attributes, $sizeAttribute);
+                        $attributes = $this->AddAttributeToRequest($attributes, $sizeAttribute);
                     }
                 }
             }
@@ -970,7 +1009,6 @@ class OzonService
         Log::info($interactionId . ' => Ozon order info: ' . $response);
         $order = json_decode($response, true);
 
-        Log::info('*****' . json_encode($order));
         if (isset($order['result'])) {
             $order->result->createDate = $orderResult->create_date;
             $fullItems = array();
@@ -1053,44 +1091,42 @@ class OzonService
 
     public function setOrderStatus($orderId, $status)
     {
-        $this->insertCategories();
-        return [];
-        // $order = $this->getOrderInfo($orderId);
-        // if (isset($order['result'])) {
-        //     $items = array();
-        //     foreach ($order->result->items as $key => $item) {
-        //         array_push($items, $item->item_id);
-        //     }
+        $order = $this->getOrderInfo($orderId);
+        if (isset($order['result'])) {
+            $items = array();
+            foreach ($order->result->items as $key => $item) {
+                array_push($items, $item->item_id);
+            }
 
-        //     if($status == config('app.order_approve_status'))
-        //     {
-        //         $interactionId = mt_srand();
-        //         Log::info($interactionId . ' => Approve ozon order:' . $ozonProductId);
-        //         $response = $this->sendData($this->approveOrderUrl, [
-        //             'order_id' => $order->result->order_id,
-        //             'item_ids' => $items
-        //         ]);
-        //         Log::info($interactionId . ' => Approve ozon order result: ' . $response);
-        //     }
-        //     if($status == config('app.order_cancel_status'))
-        //     {
-        //         $interactionId = mt_srand();
-        //         Log::info($interactionId . ' =>Cancel ozon order:' . $ozonProductId);
-        //         $response = $this->sendData($this->cancelOrderUrl, [
-        //             'order_id' => $order->result->order_id,
-        //             'reason_code' => config('app.order_cancel_reason'),
-        //             'item_ids' => $items
-        //         ]);
-        //         Log::info($interactionId . ' => Cancel ozon order result: ' . $response);
-        //     }
+            if($status == config('app.order_approve_status'))
+            {
+                $interactionId = mt_srand();
+                Log::info($interactionId . ' => Approve ozon order:' . $ozonProductId);
+                $response = $this->sendData($this->approveOrderUrl, [
+                    'order_id' => $order->result->order_id,
+                    'item_ids' => $items
+                ]);
+                Log::info($interactionId . ' => Approve ozon order result: ' . $response);
+            }
+            if($status == config('app.order_cancel_status'))
+            {
+                $interactionId = mt_srand();
+                Log::info($interactionId . ' =>Cancel ozon order:' . $ozonProductId);
+                $response = $this->sendData($this->cancelOrderUrl, [
+                    'order_id' => $order->result->order_id,
+                    'reason_code' => config('app.order_cancel_reason'),
+                    'item_ids' => $items
+                ]);
+                Log::info($interactionId . ' => Cancel ozon order result: ' . $response);
+            }
 
-        //     return [
-        //         'order_id' => $orderId,
-        //         'fulfillmentStatus' => $status
-        //     ];
-        // }
+            return [
+                'order_id' => $orderId,
+                'fulfillmentStatus' => $status
+            ];
+        }
 
-        // return $order;
+        return $order;
     }
 
 
@@ -1105,10 +1141,6 @@ class OzonService
     protected function insertChildCategories($categories)
     {
         foreach ($categories as $key => $category) {
-            Log::info('*******' . json_encode([
-                'id' => $category['category_id'],
-                'name' => $category['title']
-            ]));
             Log::info('Category inserted: ' . $category['category_id'] . ' ' . $category['title']);
             if(is_null($category['children'])) {
                 try {
@@ -1167,12 +1199,17 @@ class OzonService
                             }
                         }
                         else {
-                            Log::info('Attribute exists: ' . $attribute['id']);
-                            app('db')->connection('mysql')->table('ozon_category_attribute')
-                                ->insert([
-                                    'attribute_id' => $attribute['id'],
-                                    'ozon_category_id' => $category['category_id']
-                                ]);
+                            try {
+                                Log::info('Attribute exists: ' . $attribute['id']);
+                                app('db')->connection('mysql')->table('ozon_category_attribute')
+                                    ->insert([
+                                        'attribute_id' => $attribute['id'],
+                                        'ozon_category_id' => $category['category_id']
+                                    ]);
+                            }
+                            catch (\Exception $e) {
+                            }
+
                         }
                     }
                 }

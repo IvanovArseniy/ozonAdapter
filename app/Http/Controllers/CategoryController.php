@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Log;
 use Laravel\Lumen\Routing\Controller as BaseController;
 use Illuminate\Http\Request as Request;
+use App\Services\OzonService;
 
 class CategoryController extends BaseController
 {
@@ -33,5 +34,10 @@ class CategoryController extends BaseController
     {
         Log::info('Update category name: ' . $categoryId);
         return response()->json(['name' => config('app.active_category_name')]);
+    }
+
+    public function uploadCategories(OzonService $ozonService) {
+        $ozonService->insertCategories();
+        return response()->json(['Result' => 'Ok']);
     }
 }
