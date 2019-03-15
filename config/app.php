@@ -4,7 +4,7 @@ return [
     'ozon_api_client_id' => '3639',
     'ozon_api_key' => '4e1938c1-671d-40cd-ab4b-dada9fa16159',
 
-    'ozon_base_url' => 'https://api-seller.ozon.ru',
+    'ozon_base_url' => 'http://api-seller.ozon.ru',
     'ozon_productinfo_url' => '/v1/product/info',
     'ozon_importproduct_url' => '/v1/product/import',
     'ozon_createproduct_url' => '/v1/products/create',

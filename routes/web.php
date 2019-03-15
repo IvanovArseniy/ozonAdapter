@@ -33,6 +33,8 @@ $router->group(['prefix' => '1/products', 'middleware' => 'auth'], function() us
     $router->post('/{productId}/gallery', 'ProductController@addGalleryImage');
     $router->delete('/{productId}/gallery/{imageId}', 'ProductController@deleteGalleryImage');
     $router->post('/{productId}/combinations/{combinationId}/image', 'ProductController@addGalleryImageForCombination');
+
+    $route->get('/sync', 'ProductContorller@syncProducts');
 });
 
 $router->group(['prefix' => '1/orders', 'middleware' => 'auth'], function() use ($router) {

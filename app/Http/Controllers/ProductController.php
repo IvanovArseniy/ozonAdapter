@@ -9,8 +9,9 @@ use App\Services\OzonService;
 
 class ProductController extends BaseController
 {
-    public function getProductInfo(OzonService $ozonService, Request $request, $productId)
+    public function getProductInfo(Request $request, $productId)
     {
+        $ozonService = new OzonService ();
         Log::info('Get product info:'. json_encode($productId));
         $result = $ozonService->getProductFullInfo($productId);
         Log::info('Get product info response:'. json_encode($result));
@@ -98,5 +99,11 @@ class ProductController extends BaseController
         $imageIds = $ozonService->addGalleryImageForCombination($productId, $mallVariantId, $image);
         Log::info('Add gallery image for combunation response:'. json_encode($imageIds));
         return response()->json($imageIds);
+    }
+
+    public function syncProducts(OzonService $ozonService)
+    {
+        $ozonService->syncProducts();
+        return response()->json(['OK']);
     }
 }

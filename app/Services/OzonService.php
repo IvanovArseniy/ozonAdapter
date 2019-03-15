@@ -70,8 +70,9 @@ class OzonService
             foreach ($products as $key => $product) {
                 $response = $this->getProductFromOzon($product->ozonProductId);
 
-                $name = $response->result->name;
-                $imageResult = $this->getImages($response->result->images);
+                $response = json_decode($response, true);
+                $name = $response['result']['name'];
+                $imageResult = $this->getImages($response['result']['images']);
                 foreach ($imageResult as $key => $image) {
                     if ($image->default) {
                         $mainImage = $image->file_name;
@@ -87,10 +88,10 @@ class OzonService
                 $description = $product->description;
                 array_push($variants, [
                     'mallVariantId' => $product->mallVariantId,
-                    'inventory' => $response->result->stock,
+                    'inventory' => $response['result']['stock'],
                     'color' => $product->color,
                     'size' => $product->size,
-                    'price' => $response->result->price,
+                    'price' => $response['result']['price'],
                 ]);
             }
         }
@@ -127,7 +128,7 @@ class OzonService
     protected function getProductFromOzon($ozonProductId)
     {
         $interactionId = mt_srand();
-        Log::info($interactionId . ' => Get product info from ozon:' . $ozonProductId);
+        Log::info($interactionId . ' => Get product info from ozon:' . json_encode(['product_id' => $ozonProductId]));
         $response = $this->sendData($this->productInfoUrl, ['product_id' => $ozonProductId]);
         Log::info($interactionId . ' => Ozon products: ' . $response);
         return $response;
@@ -839,7 +840,7 @@ class OzonService
 
     protected function getImages($imageFilenames) {
         $imageResult = app('db')->connection('mysql')
-            ->select('select * from image where deleted = 0 and image_url IN (' . implode('\',\'', $imageFilenames) . ')');
+            ->select('select * from image where deleted = 0 and image_url IN (\'' . implode('\',\'', $imageFilenames) . '\')');
         if ($imageResult) {
             return $imageResult;
         }
@@ -897,25 +898,41 @@ class OzonService
                     array_push($updatedProducts, $productVariant->productId);
                     $productInfo = $this->getProductFullInfo($productVariant->productId);
 
-                    $updateFields = ['update_date' => date('Y-m-d\TH:i:s.u')];
-                    foreach ($productInfo->variants as $key => $variant) {
-                        if (
-                            $variant->price != $productVariant->price
-                            || $productInfo->name != $productVariant->name
-                            || $productInfo->imageUrl != $productVariant->imageUrl) {
-                                $updateFields->price = $variant->price;
-                                $updateFields->name = $productInfo->name;
-                                if ($productInfo->imageUrl != $productVariant->imageUrl) {
-                                    app('db')->connection('mysql')->table('image')
-                                    ->where('deleted', 0)
-                                    ->where('product_variantId', $productVariant->id)
-                                    ->update(['image_url' => $productInfo->imageUrl]);
-                                }
-                        }
+                    if($productInfo) {
+                        $updateFields = ['update_date' => date('Y-m-d\TH:i:s.u')];
+                        foreach ($productInfo->variants as $key => $variant) {
+                            if (
+                                $variant->price != $productVariant->price
+                                || $productInfo->name != $productVariant->name
+                                || $productInfo->imageUrl != $productVariant->imageUrl) {
+                                    $updateFields['price'] = $variant->price;
+                                    $updateFields['name'] = $productInfo->name;
+                                    if ($productInfo->imageUrl != $productVariant->imageUrl) {
+                                        app('db')->connection('mysql')->table('image')
+                                        ->where('deleted', 0)
+                                        ->where('product_variantId', $productVariant->id)
+                                        ->update(['image_url' => $productInfo->imageUrl]);
+                                    }
+                            }
+    
+                            app('db')->connection('mysql')->table('product_variant')
+                                ->where('id', $productVariant->id)
+                                ->update($updateFields);
 
+                            $dropshippService->updateProduct();
+                        }
+                    }
+                    else {
+                        app('db')->connection('mysql')->table('image')
+                            ->where('product_variantId', $productVariant->id)
+                            ->update(['deleted' => 1]);
+
+                        $updatedFields['deleted'] = 1;
                         app('db')->connection('mysql')->table('product_variant')
                             ->where('id', $productVariant->id)
                             ->update($updateFields);
+
+                            $dropshippService->deleteProduct();
                     }
                 }
             }
@@ -1232,11 +1249,14 @@ class OzonService
             'Api-Key: ' . config('app.ozon_api_key')
         );
         if (!is_null($data)) {
-            $data_string = json_encode(['items' => $data]);
+            $data_string = json_encode($data);
             $headers = array_merge($headers, ['Content-Type: application/json', 'Content-Length: ' . strlen($data_string)]);
             curl_setopt($ch, CURLOPT_POSTFIELDS, $data_string);
         }
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        Log::info('Url: ' . $this->baseUrl . $url);
+        Log::info('Headers: ' . json_encode($headers));
+        Log::info('Url: ' . json_encode($data));
         $response = curl_exec($ch);
         curl_close($ch);
         return $response;
