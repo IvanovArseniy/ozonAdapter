@@ -1039,20 +1039,25 @@ class OzonService
             $order['result']['createDate'] = $orderResult->create_date;
             $fullItems = array();
             foreach ($order['result']['items'] as $key => $item) {
-                $product = app('db')->connection('mysql')->table('product_variant')
-                    ->where('deleted', 0)    
-                    ->where('ozon_product_id', $item['product_id'])->first();
+                $product = app('db')->connection('mysql')
+                    ->select('select pv.product_id as productId, p.description as description from product_variant pv
+                        left join product p on p.id = pv.product_id
+                        where ozon_product_id = ' . $item['product_id']);
+                // $product = app('db')->connection('mysql')->table('product_variant')
+                //     ->where('deleted', 0)    
+                //     ->where('ozon_product_id', $item['product_id'])->first();
                 $productResponse = $this->getProductFromOzon($item['product_id']);
                 $ozonProduct = json_decode($productResponse, true);
                 $productName = '';
                 $productImage = '';
+                Log::info(json_encode($ozonProduct));
                 if (!is_null($ozonProduct['result'])) {
                     $productName = $ozonProduct['result']['name'];
                     $productImage = $ozonProduct['result']['images'][0];
                 }
 
                 array_push($fullItems, [
-                    'product_id' => $product->product_id,
+                    'product_id' => $product[0]->productId,
                     'item_id' => $item['item_id'],
                     'quantity' => $item['quantity'],
                     'offer_id' => $item['offer_id'],
@@ -1064,7 +1069,8 @@ class OzonService
                     'shipping_provider_id' => $item['shipping_provider_id'],
                     'name' => $productName,
                     'imageUrl' => $productImage,
-                    'smallThumbnailUrl' => $productImage
+                    'smallThumbnailUrl' => $productImage,
+                    'description' => $product[0]->description
                 ]);
             }
 
@@ -1090,8 +1096,8 @@ class OzonService
                 'postalCode' => $order['address']['zip_code'],
                 'city' => $order['address']['city'],
                 'street' => $order['address']['address_tail'],
-                //'countryCode': {countryCode},
-                //'stateOrProvinceName': {stateOrProvinceName}, // область, край округ и т.п.
+                'countryCode' => $this->mapCountryCode($order['address']['country']),
+                'stateOrProvinceName' => $order['address']['region']
             ],
             'items' => array()
         ];
@@ -1104,7 +1110,7 @@ class OzonService
                 'imageUrl' => $item['imageUrl'],
                 'smallThumbnailUrl' => $item['smallThumbnailUrl'],
                 //'shipping': {shipping}, // Стоимость доставки рассчитанная для этой позиции
-                //'description': {description}
+                'description' => $item['description']
             ]);
         }
         return $response;
@@ -1113,6 +1119,23 @@ class OzonService
     protected function mapOrderStatus($status)
     {
         return config('app.order_status.' . strtoupper($status));
+    }
+
+    protected function mapCountryCode($countryName)
+    {
+        $result = app('db')->connection('mysql')->table('country')
+            ->where('name', $countryName)
+            ->first();
+        if ($result) {
+            return $result->code;
+        }
+        else {
+            app('db')->connection('mysql')->table('country')
+                ->insert([
+                    'name' => $countryName
+                ]);
+            return $countryName;
+        }
     }
 
     public function setOrderStatus($orderId, $status)
