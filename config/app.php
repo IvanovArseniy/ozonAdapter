@@ -24,8 +24,8 @@ return [
     'ozon_categorylist_url' => '/v1/categories/tree',
     'ozon_categoryattributelist_url' => '/v1/categories/{category_id}/attributes',
 
-    'dropshipp_key' => 'testKey',
-    'dropshipp_owner_token' => 'testToken',
+    'dropshipp_key' => 'ak_f4d1b81c00443db21a8fdb569150ba79',
+    'dropshipp_owner_token' => 'token_b569150ba79f4d1b81c00443d',
 
     'dropshipp_base_url' => 'http://dev.dropshipp.io',
     'dropshipp_token_url' => '?-apikey={api_key}&token={owner_token}',

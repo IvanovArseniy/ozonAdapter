@@ -3,6 +3,7 @@
 namespace App\Services;
 use Log;
 use App\Services\DropshippService;
+use DateTime;
 
 class OzonService
 {
@@ -443,7 +444,6 @@ class OzonService
             $productVariants = $this->getProductVariants($productId);
             if (!is_null($productVariants) && count($productVariants) > 0) {
                 $ozonProductInfo = $this->getProductInfo($productId, $productVariants[0]->mallVariantId);
-                Log::info('*****' . json_encode());
                 $result = $this->createProduct([
                     'sku' => $product->sku,
                     'name' => $product->name,
@@ -466,7 +466,6 @@ class OzonService
             ->where('mall_variant_id', $mallVariantId)
             ->first();
             
-        Log::info('****' . json_encode($productVariant));
         if ($productVariant) {
             return [
                 'Success' => true,
@@ -948,11 +947,11 @@ class OzonService
         $since = new DateTime('now');
         $since->modify('-1 day');
         $data = [
-            // 'since' => $since->format('Y-m-d') . 'T' . $since->date('H:i:s') .'.000Z',
-            // 'to' => $to->format('Y-m-d') . 'T' . $to->date('H:i:s') .'.999Z',
-            'since' => $since->format('Y-m-d\TH:i:s.u'),
-            'to' => $to->format('Y-m-d\TH:i:s.u'),
-            'delivery_schema' => 'CB'
+            'since' => $since->format('Y-m-d') . 'T' . $since->format('H:i:s') .'.000Z',
+            'to' => $to->format('Y-m-d') . 'T' . $to->format('H:i:s') .'.999Z',
+            //'since' => $since->format('Y-m-d\TH:i:s.u'),
+            //'to' => $to->format('Y-m-d\TH:i:s.u'),
+            'delivery_schema' => 'crossborder'
         ];
 
         $interactionId = mt_srand();
@@ -962,44 +961,54 @@ class OzonService
         $result = json_decode($response, true);
 
         $notifyOrders = ['newOrders' => array(), 'existedOrders' => array(), 'deletedOrders' => array()];
-        $ozonOrders = $result->orders;
+        $ozonOrders = $result['result']['orders'];
         $existedOrders = app('db')->connection('mysql')
-            ->select('select id, status from order where deleted = 0 and ozon_order_id IN (' . implode(',', $result->order_ids) . ')');
+            ->select('select id, ozon_order_id as ozonOrderId, status from orders where deleted = 0 and ozon_order_id IN (' . implode(',', $result['result']['order_ids']) . ')');
+
+            Log::info(json_encode($existedOrders));
         foreach ($ozonOrders as $key => $ozonOrder) {
             $orderExists = false;
 
             foreach ($existedOrders as $k => $existedOrder) {
-                if ($ozonOrder->order_id == $existedOrder->id && $ozonOrder->status != $existedOrder->status) {
+                if ($ozonOrder['order_id'] == $existedOrder->ozonOrderId) {
                     $orderExists = true;
-                    array_push($notifyOrders->existedOrders, [
-                        'id' => $existedOrder->id,
-                        'oldStatus' => $this->mapOrderStatus($existedOrder->status),
-                        'newStatus' => $this->mapOrderStatus($ozonOrder->status)
-                    ]);
-                    app('db')->connection('mysql')->table('order')
-                        ->where('id', $existedOrder->id)
-                        ->update(['status' => $ozonOrder->status]);
+                    if ($ozonOrder['status'] != $existedOrder->status) {
+                        array_push($notifyOrders['existedOrders'], [
+                            'id' => $existedOrder->id,
+                            'oldStatus' => $this->mapOrderStatus($existedOrder->status),
+                            'newStatus' => $this->mapOrderStatus($ozonOrder['status'])
+                        ]);
+                        app('db')->connection('mysql')->table('orders')
+                            ->where('id', $existedOrder->id)
+                            ->update(['status' => $ozonOrder['status']]);
+                    }
                 }
             }
 
             if (!$orderExists) {
-                array_push($notifyOrders->newOrders, $ozonOrder);
-                app('db')->connection('mysql')->table('order')
+                $pdo = app('db')->connection('mysql')->getPdo();
+                $oredrResult = app('db')->connection('mysql')->table('orders')
                     ->insert([
-                        'ozon_order_id' => $ozonOrder->order_id,
+                        'ozon_order_id' => $ozonOrder['order_id'],
                         'create_date' => date('Y-m-d\TH:i:s.u'),
-                        'status' => $ozonOrder->status,
+                        'status' => $ozonOrder['status'],
                         'deleted' => 0
                     ]);
+                if ($oredrResult) {
+                    $orderId = $pdo->lastInsertId();
+                }
+                $ozonOrder['id'] = $orderId;
+                array_push($notifyOrders['newOrders'], $ozonOrder);
+
             }
         }
 
         foreach ($existedOrders as $key => $existedOrder) {
-            if (!in_array($existedOrder->id, $result->order_ids)) {
-                app('db')->connection('mysql')->table('order')
+            if (!in_array($existedOrder->ozonOrderId, $result['result']['order_ids'])) {
+                app('db')->connection('mysql')->table('orders')
                     ->where('id', $existedOrder->id)
                     ->update(['deleted' => 1]);
-                    array_push($notifyOrders->deletedOrders, $existedOrder);
+                    array_push($notifyOrders['deletedOrders'], $existedOrder);
             }
         }
 
@@ -1010,7 +1019,7 @@ class OzonService
     {
         $interactionId = mt_srand();
 
-        $orderResult = app('db')->connection('mysql')->table('order')
+        $orderResult = app('db')->connection('mysql')->table('orders')
             ->where('deleted', 0)
             ->where('id', $orderId)
             ->first();
@@ -1027,73 +1036,73 @@ class OzonService
         $order = json_decode($response, true);
 
         if (isset($order['result'])) {
-            $order->result->createDate = $orderResult->create_date;
+            $order['result']['createDate'] = $orderResult->create_date;
             $fullItems = array();
-            foreach ($order->result->items as $key => $item) {
+            foreach ($order['result']['items'] as $key => $item) {
                 $product = app('db')->connection('mysql')->table('product_variant')
                     ->where('deleted', 0)    
-                    ->where('ozon_product_id', $item->product_id)->first();
-                $productResponse = $this->getProductFromOzon($item->product_id);
-                $product = json_decode($productResponse, true);
+                    ->where('ozon_product_id', $item['product_id'])->first();
+                $productResponse = $this->getProductFromOzon($item['product_id']);
+                $ozonProduct = json_decode($productResponse, true);
                 $productName = '';
                 $productImage = '';
-                if (!is_null($product->result)) {
-                    $productName = $product->result->name;
-                    $productImage = $product->result->images[0];
+                if (!is_null($ozonProduct['result'])) {
+                    $productName = $ozonProduct['result']['name'];
+                    $productImage = $ozonProduct['result']['images'][0];
                 }
 
                 array_push($fullItems, [
-                    'product_id' => $product->productid,
-                    'item_id' => $item->item_id,
-                    'quantity' => $item->quantity,
-                    'offer_id' => $item->offer_id,
-                    'price' => $item->price,
-                    'tracking_number' => $item->tracking_number,
-                    'status' => $item->status,
-                    'cancel_reason_id' => $item->cancel_reason_id,
-                    'auto_cancel_date' => $item->auto_cancel_date,
-                    'shipping_provider_id' => $item->shipping_provider_id,
+                    'product_id' => $product->product_id,
+                    'item_id' => $item['item_id'],
+                    'quantity' => $item['quantity'],
+                    'offer_id' => $item['offer_id'],
+                    'price' => $item['price'],
+                    'tracking_number' => $item['tracking_number'],
+                    'status' => $item['status'],
+                    'cancel_reason_id' => $item['cancel_reason_id'],
+                    'auto_cancel_date' => $item['auto_cancel_date'],
+                    'shipping_provider_id' => $item['shipping_provider_id'],
                     'name' => $productName,
                     'imageUrl' => $productImage,
                     'smallThumbnailUrl' => $productImage
                 ]);
             }
 
-            $order->result->items = $fullItems;
-            return $this->mapOrder($order->result);
+            $order['result']['items'] = $fullItems;
+            return $this->mapOrder($order['result']);
         }
         return $order;
     }
 
     protected function mapOrder($order)
     {
-        $status = $this->mapOrderStatus($order->status);
+        $status = $this->mapOrderStatus($order['status']);
         $response = [
             'paymentStatus' => 'PAID',
             'fulfillmentStatus' => $status,
-            'email' => $order->address->email,
+            'email' => $order['address']['email'],
             //'ipAddress': {ipAddress}, ??
-            'createDate' => $order->createDate,
+            'createDate' => $order['createDate'],
             'refererUrl' => 'http://ozon.ru/',
             'shippingPerson' => [
-                'name' => $order->adress->addressee,
-                'phone' => $order->adress->phone,
-                'postalCode' => $order->adress->zip_code,
-                'city' => $order->adress->city,
-                'street' => $order->adress->address_tail,
+                'name' => $order['address']['addressee'],
+                'phone' => $order['address']['phone'],
+                'postalCode' => $order['address']['zip_code'],
+                'city' => $order['address']['city'],
+                'street' => $order['address']['address_tail'],
                 //'countryCode': {countryCode},
                 //'stateOrProvinceName': {stateOrProvinceName}, // область, край округ и т.п.
             ],
             'items' => array()
         ];
 
-        foreach ($order->items as $key => $item) {
-            array_push($response->items, [
-                'price' => $item->price,
-                'quantity' => $item->quantity,
-                'name' => $item->name,
-                'imageUrl' => $item->imageUrl,
-                'smallThumbnailUrl' => $item->smallThumbnailUrl,
+        foreach ($order['items'] as $key => $item) {
+            array_push($response['items'], [
+                'price' => $item['price'],
+                'quantity' => $item['quantity'],
+                'name' => $item['name'],
+                'imageUrl' => $item['imageUrl'],
+                'smallThumbnailUrl' => $item['smallThumbnailUrl'],
                 //'shipping': {shipping}, // Стоимость доставки рассчитанная для этой позиции
                 //'description': {description}
             ]);
@@ -1103,7 +1112,7 @@ class OzonService
 
     protected function mapOrderStatus($status)
     {
-        return config('app.order_status.' . $status);
+        return config('app.order_status.' . strtoupper($status));
     }
 
     public function setOrderStatus($orderId, $status)
