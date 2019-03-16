@@ -1001,7 +1001,8 @@ class OzonService
         Log::info($interactionId . ' => Ozon order info: ' . $response);
         $result = json_decode($response, true);
 
-        $notifyOrders = ['newOrders' => array(), 'existedOrders' => array(), 'deletedOrders' => array()];
+        $notifyingOrders = [];
+        $notifyingOrderIds = [];
         $ozonOrders = $result['result']['orders'];
         $existedOrders = app('db')->connection('mysql')
             ->select('select id, ozon_order_id as ozonOrderId, status from orders where ozon_order_id IN (' . implode(',', $result['result']['order_ids']) . ')');
@@ -1022,12 +1023,19 @@ class OzonService
             foreach ($existedOrders as $k => $existedOrder) {
                 if ($ozonOrder['order_id'] == $existedOrder->ozonOrderId) {
                     $orderExists = true;
-                    if ($ozonOrder['status'] != $existedOrder->status || !$existedOrder->notified) {
-                        array_push($notifyOrders['existedOrders'], [
-                            'id' => $existedOrder->id,
-                            'oldStatus' => $this->mapOrderStatus($existedOrder->status),
-                            'newStatus' => $this->mapOrderStatus($ozonOrder['status'])
+                    if ($ozonOrder['status'] != $existedOrder->status) {
+
+                        array_push($notifyingOrderIds, $existedOrder->id);
+                        array_push($notifyingOrders, [
+                            'type' => 'update',
+                            'notified' => 0,
+                            'data' => json_encode([
+                                'oldFulfillmentStatus' => $this->mapOrderStatus($existedOrder->status),
+                                'newFulfillmentStatus' => $this->mapOrderStatus($ozonOrder['status'])
+                            ]),
+                            'order_id' => $existedOrder->id
                         ]);
+
                         app('db')->connection('mysql')->table('orders')
                             ->where('id', $existedOrder->id)
                             ->update(['status' => $ozonOrder['status']]);
@@ -1037,19 +1045,22 @@ class OzonService
 
             if (!$orderExists) {
                 $pdo = app('db')->connection('mysql')->getPdo();
-                $oredrResult = app('db')->connection('mysql')->table('orders')
+                $orderResult = app('db')->connection('mysql')->table('orders')
                     ->insert([
                         'ozon_order_id' => $ozonOrder['order_id'],
                         'create_date' => date('Y-m-d\TH:i:s.u'),
                         'status' => $ozonOrder['status'],
                         'deleted' => 0
                     ]);
-                if ($oredrResult) {
+                if ($orderResult) {
                     $orderId = $pdo->lastInsertId();
                 }
-                $ozonOrder['id'] = $orderId;
-                array_push($notifyOrders['newOrders'], $ozonOrder);
-
+                array_push($notifyingOrderIds, $orderId);
+                array_push($notifyingOrders, [
+                    'type' => 'create',
+                    'notified' => 0,
+                    'order_id' => $orderId
+                ]);
             }
         }
 
@@ -1058,11 +1069,20 @@ class OzonService
                 app('db')->connection('mysql')->table('orders')
                     ->where('id', $existedOrder->id)
                     ->update(['deleted' => 1]);
-                    array_push($notifyOrders['deletedOrders'], $existedOrder);
+
+                array_push($notifyingOrderIds, $existedOrder->id);
+                array_push($notifyingOrders, [
+                    'type' => 'delete',
+                    'notified' => 0,
+                    'order_id' => $existedOrder->id
+                ]);
             }
         }
 
-        return $notifyOrders;
+        app('db')->connection('mysql')->table('order_notification')
+            ->insert($notifyingOrders);
+
+        return $notifyingOrderIds;
     }
 
     public function getOrderInfo($orderId)

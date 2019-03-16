@@ -30,65 +30,92 @@ class DropshippService
         return $url;
     }
 
-    public function notifyOrders($notifyOrders)
+    public function notifyOrders($orderIds)
     {
-        $existedResult = $this->notifyExistedOrders($notifyOrders['existedOrders']);
-        $newResult = $this->notifyNewOrders($notifyOrders['newOrders']);
-        $deletedResult = $this->notifyDeletedOrders($notifyOrders['deletedOrders']);
-        return ['existedOrders' => $existedResult, 'newOrders' => $newResult];
+        $notifications = app('db')->connection('mysql')->table('order_notification')
+            ->whereIn('order_id', $orderIds)
+            ->where('notified', 0)
+            ->get();
+        $successNotifications = [];
+        $notificationResult = [];
+        foreach ($notifications as $key => $notification) {
+            if ($notification->type == 'create') {
+                $result = $this->notifyNewOrder($notification->order_id);
+                if (!isset($result['error'])) {
+                    array_push($successNotifications, $notification->id);
+                    array_push($notificationResult, $result);
+                }
+            }
+            if ($notification->type == 'update') {
+                $result = $this->notifyExistedOrder($notification->order_id, $notification->data);
+                if (!isset($result['error'])) {
+                    array_push($successNotifications, $notification->id);
+                    array_push($notificationResult, $result);
+                }
+            }
+            elseif ($notification->type == 'delete') {
+                $result = $this->notifyDeletedOrder($notification->order_id);
+                if (!isset($result['error'])) {
+                    array_push($successNotifications, $notification->id);
+                    array_push($notificationResult, $result);
+                }
+            }
+            else {
+                array_push($successNotifications, $notification->id);
+            }
+        }
+
+        app('db')->connection('mysql')->table('product_notification')
+            ->whereIn('id', $successNotifications)
+            ->update(['notified' => 1]);        
+
+        return $notificationResult;
     }
     
-    protected function notifyExistedOrders($orders)
+    protected function notifyExistedOrder($orderId, $data)
     {
-        foreach ($orders as $key => $order) {
-            $data_string = json_encode([
-                'oldFulfillmentStatus' => $order->oldStatus,
-                'newFulfillmentStatus' => $order->newStatus
-            ]);
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{store_num}', $order['order_id'], $this->orderUrl)));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-                'Content-Type: application/json',                                                                                
-                'Content-Length: ' . strlen($data_string))                                                                
-            );  
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $data_string);  
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
-            Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $order['order_id'], $this->orderUrl)));
-            $response = curl_exec($ch);
-            curl_close($ch);
-            Log::info('Update order: ' . $response);
-        }
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderId, $this->orderUrl)));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+            'Content-Type: application/json',                                                                                
+            'Content-Length: ' . strlen($data))                                                                
+        );  
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);  
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
+        Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderId, $this->orderUrl)));
+        $response = curl_exec($ch);
+        curl_close($ch);
+        Log::info('Update order: ' . $response);
+        return json_decode($response, true);
     }
 
-    protected function notifyNewOrders($orders)
+    protected function notifyNewOrder($orderId)
     {
-        Log::info('New orders:' . json_encode($orders));
-        foreach ($orders as $key => $order) {
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{store_num}', $order['id'], $this->orderUrl)));
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-            Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $order['id'], $this->orderUrl)));
-            $response = curl_exec($ch);
-            curl_close($ch);
-            Log::info('Notify new order: ' . $response);
-        }
+        Log::info('New order:' . json_encode($orderId));
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderId, $this->orderUrl)));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+        Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderId, $this->orderUrl)));
+        $response = curl_exec($ch);
+        curl_close($ch);
+        Log::info('Notify new order: ' . $response);
+        return json_decode($response, true);
     }
 
-    protected function notifyDeletedOrders($orders)
+    protected function notifyDeletedOrder($orderId)
     {
-        Log::info('Deleted orders:' . json_encode($orders));
-        foreach ($orders as $key => $order) {
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{store_num}', $order->id, $this->orderUrl)));
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
-            Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $order->id, $this->orderUrl)));
-            $response = curl_exec($ch);
-            curl_close($ch);
-            Log::info('Notify deleted order: ' . $response);
-        }
+        Log::info('Deleted order:' . json_encode($orderId));
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderId, $this->orderUrl)));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+        Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderId, $this->orderUrl)));
+        $response = curl_exec($ch);
+        curl_close($ch);
+        Log::info('Notify deleted order: ' . $response);
+        return json_decode($response, true);
     }
 
     public function getOrderList(Type $var = null)
