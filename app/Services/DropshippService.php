@@ -11,11 +11,15 @@ class DropshippService
     protected $orderUrl;
     protected $setOrderStatusUrl;
 
+    protected $updateProductUrl;
+    protected $deleteProductUrl;
+
     public function __construct() {
         $this->baseUrl = config('app.dropshipp_base_url');
         $this->tokenUrl = config('app.dropshipp_token_url');
         $this->orderUrl = config('app.dropshipp_order_url');
         $this->setOrderStatusUrl = '';
+        $this->updateProductUrl = config('app.dropshipp_updateproduct_url');
     }
 
     protected function addToken($url)
@@ -97,13 +101,64 @@ class DropshippService
         # code...
     }
 
-    public function CreateOrder(Type $var = null)
+    public function notifyProducts($productIds)
     {
-        # code...
+        $notifications = app('db')->connection('mysql')->table('product_notification')
+            ->whereIn('product_id', $productIds)
+            ->where('notified', 0)
+            ->get();
+        $successNotifications = [];
+        foreach ($notifications as $key => $notification) {
+            if ($notification->type == 'update') {
+                $result = $this->updateProduct($notification->product_id, $notification->data);
+                if (!isset($result['error'])) {
+                    array_push($successNotifications, $notification->id);
+                }
+            }
+            elseif ($notification->type == 'delete') {
+                $result = $this->deleteProduct($notification->product_id);
+                if (!isset($result['error'])) {
+                    array_push($successNotifications, $notification->id);
+                }
+            }
+            else {
+                array_push($successNotifications, $notification->id);
+            }
+        }
+
+        app('db')->connection('mysql')->table('product_notification')
+            ->whereIn('id', $successNotifications)
+            ->update(['notified' => 1]);
     }
 
-    public function UpdateOrder(Type $var = null)
+    protected function updateProduct($productId, $data)
     {
-        # code...
+        Log::info('Update product:' . $productId . '=>' . $data);
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{product_id}', $productId, $this->updateProductUrl)));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
+        $headers = ['Content-Type: application/json', 'Content-Length: ' . strlen($data)];
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{product_id}', $productId, $this->updateProductUrl)));
+        $response = curl_exec($ch);
+        curl_close($ch);
+        Log::info('Update product result: ' . $response);
+        return json_decode($response, true);
+    }
+
+    protected function deleteProduct($productId)
+    {
+        Log::info('Deleted product:' . $productId);
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{product_id}', $productId, $this->updateProductUrl)));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+        Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{product_id}', $productId, $this->updateProductUrl)));
+        $response = curl_exec($ch);
+        curl_close($ch);
+        Log::info('Delete product result: ' . $response);
+        return json_decode($response, true);
     }
 }

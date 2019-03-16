@@ -32,6 +32,8 @@ return [
     //'dropshipp_order_url' => '/api/v1/orders/{owner_id}/{store_num}'
     'dropshipp_order_url' => '/api/v1/orders/1/{store_num}',
 
+    'dropshipp_updateproduct_url' => '/api/v1/products/1/{product_id}',
+
     'active_category_id' => '1',
     'active_category_name' => 'test',
 

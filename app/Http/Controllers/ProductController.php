@@ -6,6 +6,7 @@ use Log;
 use Laravel\Lumen\Routing\Controller as BaseController;
 use Illuminate\Http\Request as Request;
 use App\Services\OzonService;
+use App\Services\DropshippService;
 
 class ProductController extends BaseController
 {
@@ -101,9 +102,11 @@ class ProductController extends BaseController
         return response()->json($imageIds);
     }
 
-    public function syncProducts(OzonService $ozonService)
+    public function syncProducts(OzonService $ozonService, DropshippService $dropshippService)
     {
-        $ozonService->syncProducts();
+        Log::info('Sync started!');
+        $notifyingProductIds = $ozonService->syncProducts();
+        $dropshippService->notifyProducts($notifyingProductIds);
         return response()->json(['OK']);
     }
 }

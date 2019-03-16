@@ -140,14 +140,19 @@ class OzonService
         $productId = 0;
         //TODO:dubles
         $pdo = app('db')->connection('mysql')->getPdo();
-        $result = app('db')->connection('mysql')->table('product')
-            ->insert([
-                'name' => $product['name'],
-                'sku' => $product['sku'],
-                'enabled' => $product['enabled'],
-                'update_date' => date('Y-m-d\TH:i:s.u'),
-                'description' => $product['description']
-            ]);
+        $result = null;
+        try {
+            $result = app('db')->connection('mysql')->table('product')
+                ->insert([
+                    'name' => $product['name'],
+                    'sku' => $product['sku'],
+                    'enabled' => $product['enabled'],
+                    'update_date' => date('Y-m-d\TH:i:s.u'),
+                    'description' => $product['description']
+                ]); 
+        } catch (\Exception $e) {
+
+        }
         if ($result) {
             $productId = $pdo->lastInsertId();
         }
@@ -871,10 +876,13 @@ class OzonService
 
 
     ////ScheduledProductUpdate
-    public function syncProducts($dropshippService)
+    public function syncProducts()
     {
         $updatedProducts = array();
-        $result = app('db')->connaction('mysql')->select('
+        $productResult = app('db')->connection('mysql')->select('select id from product order by update_date asc limit ' . config('app.sync_portion') . '');
+        $productResult = array_map('current', json_decode(json_encode($productResult), true));
+
+        $result = app('db')->connection('mysql')->select('
             select 
                 pv.id as id,
                 pv.product_id as productId,
@@ -887,10 +895,11 @@ class OzonService
             from product p
             inner join product_variant pv on p.id = pv.product_id
             left join image i on (i.product_variant_id = pv.id and i.default = 1)
-            where product_id in (select top ' . config(app.sync_portion) . ' id from product order by p.update_date asc)
+            where product_id in (' . implode(',', $productResult) . ')
         ');
 
-            //Цена, наименование товара, описание, картинка
+        $notifyingProducts = [];
+        $notifyingProductIds = [];
         if ($result) {
             foreach ($result as $key => $productVariant) {
                 if (!in_array($productVariant->productId, $updatedProducts)) {
@@ -898,27 +907,50 @@ class OzonService
                     $productInfo = $this->getProductFullInfo($productVariant->productId);
 
                     if($productInfo) {
-                        $updateFields = ['update_date' => date('Y-m-d\TH:i:s.u')];
-                        foreach ($productInfo->variants as $key => $variant) {
+                        $updateFields = [];
+                        $updateProductFields = ['update_date' => date('Y-m-d\TH:i:s.u')];
+                        foreach ($productInfo['variants'] as $key => $variant) {
                             if (
-                                $variant->price != $productVariant->price
-                                || $productInfo->name != $productVariant->name
-                                || $productInfo->imageUrl != $productVariant->imageUrl) {
-                                    $updateFields['price'] = $variant->price;
-                                    $updateFields['name'] = $productInfo->name;
-                                    if ($productInfo->imageUrl != $productVariant->imageUrl) {
+                                $variant['price'] != $productVariant->price
+                                || $productInfo['name'] != $productVariant->name
+                                || $productInfo['imageUrl'] != $productVariant->imageUrl) {
+                                    $updateFields['price'] = $variant['price'];
+                                    $updateProductFields['name'] = $productInfo['name'];
+                                    if ($productInfo['imageUrl'] != $productVariant->imageUrl) {
                                         app('db')->connection('mysql')->table('image')
                                         ->where('deleted', 0)
                                         ->where('product_variantId', $productVariant->id)
-                                        ->update(['image_url' => $productInfo->imageUrl]);
+                                        ->update(['image_url' => $productInfo['imageUrl']]);
                                     }
                             }
-    
-                            app('db')->connection('mysql')->table('product_variant')
-                                ->where('id', $productVariant->id)
-                                ->update($updateFields);
 
-                            $dropshippService->updateProduct();
+                            if (count($updateFields) > 0 || count($updateProductFields) > 1) {
+                                if (count($updateFields) > 0) {
+                                    app('db')->connection('mysql')->table('product_variant')
+                                    ->where('id', $productVariant->id)
+                                    ->update($updateFields);
+                                }
+
+                                app('db')->connection('mysql')->table('product')
+                                    ->where('id', $productVariant->id)
+                                    ->update($updateProductFields);
+
+                                $product = [
+                                    'name' => $productInfo['name'],
+                                    'description' => $productInfo['description'],
+                                    'imageUrl' => $productInfo['imageUrl'],
+                                    'galleryImages' => $productInfo['galleryImages'],
+                                    'combinations' => $productInfo['variants']
+                                ];
+    
+                                array_push($notifyingProductIds, $productVariant->productId);
+                                array_push($notifyingProducts, [
+                                    'type' => 'update',
+                                    'notified' => 0,
+                                    'data' => json_encode($product),
+                                    'product_id' => $productVariant->productId
+                                ]);
+                            }
                         }
                     }
                     else {
@@ -931,11 +963,20 @@ class OzonService
                             ->where('id', $productVariant->id)
                             ->update($updateFields);
 
-                            $dropshippService->deleteProduct();
+                        array_push($notifyingProductIds, $productVariant->productId);
+                        array_push($notifyingProducts, [
+                            'type' => 'delete',
+                            'notified' => 0,
+                            'product_id' => $productVariant->productId
+                        ]);
                     }
                 }
             }
+
+            app('db')->connection('mysql')->table('product_notification')
+                ->insert($notifyingProducts);
         }
+        return $notifyingProductIds;
     }
 
 
@@ -963,16 +1004,25 @@ class OzonService
         $notifyOrders = ['newOrders' => array(), 'existedOrders' => array(), 'deletedOrders' => array()];
         $ozonOrders = $result['result']['orders'];
         $existedOrders = app('db')->connection('mysql')
-            ->select('select id, ozon_order_id as ozonOrderId, status from orders where deleted = 0 and ozon_order_id IN (' . implode(',', $result['result']['order_ids']) . ')');
+            ->select('select id, ozon_order_id as ozonOrderId, status from orders where ozon_order_id IN (' . implode(',', $result['result']['order_ids']) . ')');
 
-            Log::info(json_encode($existedOrders));
+        //Как сдесь сделать чтобы новый заказ, если он вдруг не ушел в DS, снова туда отправился, причем как новый
+        //сделать таблицу нотификаций, инсертить в нее записи о нотификациях и затем отправлять все, связанные с заказом
+        //инсертить в озон сервисе
+        //выбирать в Dropshipp сервисе и отправлять
+        //правильно, по списку номеров заказов
+        //Получили список заказов 1 2 3, нагенерили 5 уведомлений. Дальше идем и по каждому заказу отправляем все его
+        //Если не отправилось, на следующий проход по этому же списку заказов генерим новые уведомления
+        //!!!!!! круто :)
+
+
         foreach ($ozonOrders as $key => $ozonOrder) {
             $orderExists = false;
 
             foreach ($existedOrders as $k => $existedOrder) {
                 if ($ozonOrder['order_id'] == $existedOrder->ozonOrderId) {
                     $orderExists = true;
-                    if ($ozonOrder['status'] != $existedOrder->status) {
+                    if ($ozonOrder['status'] != $existedOrder->status || !$existedOrder->notified) {
                         array_push($notifyOrders['existedOrders'], [
                             'id' => $existedOrder->id,
                             'oldStatus' => $this->mapOrderStatus($existedOrder->status),
@@ -1043,14 +1093,10 @@ class OzonService
                     ->select('select pv.product_id as productId, p.description as description from product_variant pv
                         left join product p on p.id = pv.product_id
                         where ozon_product_id = ' . $item['product_id']);
-                // $product = app('db')->connection('mysql')->table('product_variant')
-                //     ->where('deleted', 0)    
-                //     ->where('ozon_product_id', $item['product_id'])->first();
                 $productResponse = $this->getProductFromOzon($item['product_id']);
                 $ozonProduct = json_decode($productResponse, true);
                 $productName = '';
                 $productImage = '';
-                Log::info(json_encode($ozonProduct));
                 if (!is_null($ozonProduct['result'])) {
                     $productName = $ozonProduct['result']['name'];
                     $productImage = $ozonProduct['result']['images'][0];
