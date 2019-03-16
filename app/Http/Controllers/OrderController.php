@@ -26,9 +26,8 @@ class OrderController extends BaseController
         return response()->json($result);
     }
 
-    public function getOrderList(OzonService $ozonService)
+    public function getOrderList(OzonService $ozonService, DropshippService $dropshippService)
     {
-        $dropshippService = new DropshippService ();
         Log::info('Get list of orders');
         $notifyingOrderIds = $ozonService->getOrderList();
         $notifyResult = $dropshippService->notifyOrders($notifyingOrderIds);
