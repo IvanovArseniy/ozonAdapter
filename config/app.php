@@ -14,7 +14,6 @@ return [
     'activate_product_url' => '/v1/products/deactivate',
     'update_productprices_url' => '/v1/products/prices',
     'ozon_product_group_attribute' => 8292,
-    'product_import' => true,
 
     'ozon_orderlist_url' => '/v1/order/list',
     'ozon_orderinfo_url' => '/v1/order/{orderId}?translit=true',

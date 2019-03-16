@@ -164,103 +164,113 @@ class OzonService
             ];
         }
 
-        return $this->createProduct($product, $productId);
+        $variantIds = $this->createVariants($product['variants'], $productId);
+
+        return ['id' => $productId];
     }
 
-    protected function createProduct($product, $productId)
+    protected function createVariants($variants, $productId)
     {
-        $items = array();
-        $innerItems = array();
-        $errors = array();
-        foreach ($product['variants'] as $key => $variant) {
-            $item = $this->addProductToRequest(
-                $variant['mallVariantId'],
-                $product['sku'],
-                $product['description'],
-                $product['name'],
-                $variant['price'],
-                $variant['inventory'],
-                $product['weight'],
-                !$product['unlimited'],
-                $product['enabled'],
-                $product['categoryIds'],
-                $variant['color'],
-                $variant['size'],
-                $productId
-            );
+        $insertedVariants = [];
+        foreach ($variants as $key => $variant) {
+            array_push($insertedVariants, [
 
-            if (!isset($item['success'])) {
-                array_push($items, $item);
-            }
-            else {
-                array_push($errors, $item['error']);
-            }
-            array_push($innerItems, [
-                'color' => $variant['color'],
-                'size' => $variant['size'],
-                'price' => $variant['price'],
-                'description' => $product['description'],
-                'name' => $product['name']
             ]);
         }
 
-        $result = $this->sendProductsToOzon($items);
+        app('db')->connection('mysql')->table('product_variant')
+            ->insert($insertedVariants);
 
-        $productId = null;
-        $quantityItems = array();
+            //как получить inserted variants
+        $variantIds;
 
-        if (!isset($result['error'])) {
-            for ($i=0; $i < count($result['result']); $i++) { 
-                app('db')->connection('mysql')->table('product_variant')
-                    ->insert([
-                        'ozon_product_id' => $result['result'][$i],
-                        'product_id' => $items[$i]['dropshippProductId'],
-                        'mall_variant_id' => $items[$i]['mallVariantId'],
-                        'price' => $innerItems[$i]['price'],
-                        'color' => $innerItems[$i]['color'],
-                        'size' => $innerItems[$i]['size'],
-                        'deleted' => 0
-                    ]);
+        return $variantIds;
+    }
 
-                array_push($quantityItems, [
-                    'product_id' => $result['result'][$i],
-                    'stock' => $items[$i]['quantity']
-                ]);
-
-                $productId = $items[$i]['dropshippProductId'];
-            }
-
-            $this->setQuantity($quantityItems);
+    public function createProductSchedule($productId = null)
+    {
+        $variants = null;
+        if (is_null($productId)) {
+            $variants = app('db')->connection('mysql')->select('
+                select * from product_variant pv
+                    join product p on pv.product_id = p.product_id
+                    where pv.ozon_product_id is null and is_send = 0
+            ');
         }
         else {
-            array_push($errors, $result['error']);
+            $variants = app('db')->connection('mysql')->select('
+                select * from product_variant pv
+                    join product p on pv.product_id = p.product_id
+                    where pv.ozon_product_id is null and is_send = 0 and product_id = ' . $productId . '
+            ');
         }
 
-        return [
-            'id' => $productId,
-            'errors' => $errors
-        ];
+        if ($variants) {
+            $items = [];
+            $variantIds = [];
+            foreach ($variants as $key => $variant) {
+                $item = $this->addProductToRequest(
+                    //здесь нужны правильные поля
+                    $variant['mallVariantId'],
+                    $product['sku'],
+                    $product['description'],
+                    $product['name'],
+                    $variant['price'],
+                    $variant['inventory'],
+                    $product['weight'],
+                    !$product['unlimited'],
+                    $product['enabled'],
+                    $product['categoryIds'],
+                    $variant['color'],
+                    $variant['size'],
+                    $productId
+                );
+                if (!isset($item['success'])) {
+                    array_push($items, $item);
+                    array_push($variantIds, $variant->id);
+                }
+            }
+
+            $result = $this->sendProductsToOzon($items);
+            if (isset($result['task_id'])) {
+                app('db')->connection('mysql')->table('product_variant')
+                    ->whereIn('id', $variantIds)
+                    //Add is_send
+                    ->update(['is_send' => 1]);
+            }
+        }
+    }
+
+    public function setOzonProductId()
+    {
+        $ozonProducts;//select ozon products
+
+        $variants = app('db')->connection('mysql')->table('product_variant')
+            ->whereNull('ozon_product_id')
+            ->get();
+
+        foreach ($variants as $key => $variant) {
+            foreach ($ozonProducts as $key => $ozonProduct {
+                if($variant->mall_variant_id == $ozonProduct['offer_id']) {
+                    app('db')->connection('mysql')->table('product_variant')
+                        ->where('id', $variant->id)
+                        ->update(['ozon_product_id' => $ozonProduct['product_id']]);
+
+                    $this->setQuantity([
+                        'product_id' => $ozonProduct['product_id'],
+                        'stock' => $variant->stock
+                    ]);
+                }
+            }
+        }
     }
 
     protected function sendProductsToOzon($items) {
-        if(config('app.product_import')) {
-            $interactionId = mt_srand();
-            Log::info($interactionId . ' => Import product request to ozon:' . json_encode(['items' => $items]));
-            $response = $this->sendData($this->importProductsUrl, ['items' => $items]);
-            Log::info($interactionId . ' => Import ozon products: ' . $response);
-            $result = json_decode($response, true);
-            $result = ['result' => [6974580]];
-        }
-        else {
-            $result = array();
-            foreach ($items as $key => $item) {
-                $interactionId = mt_srand();
-                Log::info($interactionId . ' => Create product request to ozon:' . json_encode($item));
-                $response = $this->sendData($this->createProductsUrl, $item);
-                Log::info($interactionId . ' => Create ozon products: ' . $response);
-                array_push($result, json_decode($response));
-            }
-        }
+        $interactionId = mt_srand();
+        Log::info($interactionId . ' => Import product request to ozon:' . json_encode(['items' => $items]));
+        $response = $this->sendData($this->importProductsUrl, ['items' => $items]);
+        Log::info($interactionId . ' => Import ozon products: ' . $response);
+        $result = json_decode($response, true);
         return $result;
     }
 
@@ -446,17 +456,14 @@ class OzonService
         $product = app('db')->connection('mysql')->table('product')
             ->where('id', $productId)->first();
         if (!is_null($product)) {
-            $productVariants = $this->getProductVariants($productId);
-            if (!is_null($productVariants) && count($productVariants) > 0) {
-                $ozonProductInfo = $this->getProductInfo($productId, $productVariants[0]->mallVariantId);
-                $result = $this->createProduct([
-                    'sku' => $product->sku,
-                    'name' => $product->name,
-                    'description' => $product->description,
-                    'variants' => $combinations
-                ], $productId);
-                return $result;
+            $variantIds = $this->createVariants($combinations, $pproductId);
+            $result = [];
+            foreach ($variantIds as $key => $id) {
+                array_push($result, [
+                    'store_variant_id' => $id
+                ]);
             }
+            return $result;
         }
         return [
             'Error' => 'Product not found'
@@ -685,16 +692,27 @@ class OzonService
         return $response;
     }
 
-    public function addMainImage($productId, $image)
+    public function addMainImage($productId, $imageUrl)
     {
         $result = [];
+
         $productVariants = $this->getProductVariants($productId);
         if (!is_null($productVariants)) {
+            $imageId = $this->saveImage([
+                'product_id' => $productId,
+                'default' => true,
+                'image_url' => $imageUrl,
+                'deleted' = 0
+            ]);
+
             foreach ($productVariants as $key => $variant) {
-                $updateResult = $this->updateOzonProduct(['image' => array([
-                    'file_name' => $image->externalUrl,
-                    'default' => true
-                ])], $productId, $variant->mallVariantId);
+
+                if (!is_null($variant->ozonProductId)) {
+                    $updateResult = $this->updateOzonProduct(['image' => array([
+                        'file_name' => $image->externalUrl,
+                        'default' => true
+                    ])], $productId, $variant->mallVariantId);
+                }
                 array_push($result, $updateResult['imageIds']);
             }
         }
@@ -1006,16 +1024,6 @@ class OzonService
         $ozonOrders = $result['result']['orders'];
         $existedOrders = app('db')->connection('mysql')
             ->select('select id, ozon_order_id as ozonOrderId, status from orders where ozon_order_id IN (' . implode(',', $result['result']['order_ids']) . ')');
-
-        //Как сдесь сделать чтобы новый заказ, если он вдруг не ушел в DS, снова туда отправился, причем как новый
-        //сделать таблицу нотификаций, инсертить в нее записи о нотификациях и затем отправлять все, связанные с заказом
-        //инсертить в озон сервисе
-        //выбирать в Dropshipp сервисе и отправлять
-        //правильно, по списку номеров заказов
-        //Получили список заказов 1 2 3, нагенерили 5 уведомлений. Дальше идем и по каждому заказу отправляем все его
-        //Если не отправилось, на следующий проход по этому же списку заказов генерим новые уведомления
-        //!!!!!! круто :)
-
 
         foreach ($ozonOrders as $key => $ozonOrder) {
             $orderExists = false;

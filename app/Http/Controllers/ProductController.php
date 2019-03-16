@@ -38,7 +38,7 @@ class ProductController extends BaseController
         $combinations = json_decode($request->getContent(), true);
         Log::info('Create product combination:'. json_encode($request->getContent()));
         $result = $ozonService->createProductCombination($productId, $combinations);
-        Log::info('Create product combination response:'. json_encode(['id' => $productId]));
+        Log::info('Create product combination response:'. json_encode($result));
         return response()->json($result);
     }
 
@@ -66,7 +66,7 @@ class ProductController extends BaseController
         $productId = $request->input('productId');
         $image = json_decode($request->getContent());
         Log::info('Add main image:'. json_encode($request->getContent()));
-        $imageIds = $ozonService->addMainImage($productId, $image);
+        $imageIds = $ozonService->addMainImage($productId, $image->externalUrl  );
         Log::info('Add main image response:'. json_encode($imageIds));
         return response()->json($imageIds);
     }
