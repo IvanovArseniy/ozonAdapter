@@ -25,12 +25,21 @@ class ProductController extends BaseController
         Log::info('Create product:'. json_encode($request->getContent()));
         if (!is_null($product) && isset($product['name']) && isset($product['variants']) && count($product['variants']) > 0) {
             $result = $ozonService->createNewProduct($product);
+            $ozonService->createProductSchedule($result['id']);
+            $ozonService->setOzonProductId();
             Log::info('Create product response:'. json_encode($result));
             return response()->json($result);
         }
         else {
             return response()->json(['Error' => 'Required fields are not present!']);
         }
+    }
+
+    public function setProductExternalId(OzonService $ozonService)
+    {
+        Log::info('Set product external Ids started');
+        $ozonService->setOzonProductId();
+        Log::info('Set product external Ids finished');
     }
 
     public function createProductCombination(OzonService $ozonService, Request $request, $productId)
@@ -64,9 +73,9 @@ class ProductController extends BaseController
     public function addMainImage(OzonService $ozonService, Request $request)
     {
         $productId = $request->input('productId');
-        $image = json_decode($request->getContent());
+        $image = json_decode($request->getContent(), true);
         Log::info('Add main image:'. json_encode($request->getContent()));
-        $imageIds = $ozonService->addMainImage($productId, $image->externalUrl  );
+        $imageIds = $ozonService->addMainImage($productId, $image['externalUrl']);
         Log::info('Add main image response:'. json_encode($imageIds));
         return response()->json($imageIds);
     }

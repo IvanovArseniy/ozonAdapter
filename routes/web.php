@@ -35,8 +35,9 @@ $router->group(['prefix' => '1/products', 'middleware' => 'auth'], function() us
     $router->post('/{productId}/combinations/{combinationId}/image', 'ProductController@addGalleryImageForCombination');
 });
 
-$router->group(['prefix' => '1/sync', 'middleware' => 'auth'], function() use ($router) {
-    $router->get('/', 'ProductController@syncProducts');
+$router->group(['prefix' => '1/tech', 'middleware' => 'auth'], function() use ($router) {
+    $router->get('/sync', 'ProductController@syncProducts');
+    $router->get('/setIds', 'ProductController@setProductExternalId');
 });
 
 $router->group(['prefix' => '1/orders', 'middleware' => 'auth'], function() use ($router) {
