@@ -25,7 +25,7 @@ class ProductController extends BaseController
         Log::info('Create product:'. json_encode($request->getContent()));
         if (!is_null($product) && isset($product['name']) && isset($product['variants']) && count($product['variants']) > 0) {
             $result = $ozonService->createNewProduct($product);
-            $ozonService->createProductSchedule($result['id']);
+            $ozonService->scheduleProductCreation($result['id']);
             $ozonService->setOzonProductId();
             Log::info('Create product response:'. json_encode($result));
             return response()->json($result);
@@ -33,6 +33,13 @@ class ProductController extends BaseController
         else {
             return response()->json(['Error' => 'Required fields are not present!']);
         }
+    }
+
+    public function scheduleProductCreation(OzonService $ozonService)
+    {
+        Log::info('Product creation scheduled. Start');
+        $ozonService->scheduleProductCreation();
+        Log::info('Product creation scheduled. Finish');
     }
 
     public function setProductExternalId(OzonService $ozonService)
@@ -115,6 +122,13 @@ class ProductController extends BaseController
     {
         Log::info('Sync started!');
         $notifyingProductIds = $ozonService->syncProducts();
+        $dropshippService->notifyProducts($notifyingProductIds);
+        return response()->json(['OK']);
+    }
+
+    public function notifyProducts(OzonService $ozonService)
+    {
+        Log::info('Notify product started!');
         $dropshippService->notifyProducts($notifyingProductIds);
         return response()->json(['OK']);
     }

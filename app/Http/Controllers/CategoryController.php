@@ -9,19 +9,32 @@ use App\Services\OzonService;
 
 class CategoryController extends BaseController
 {
-    public function getCategoryName(Request $request, $categoryId)
+    public function getCategoryName(OzonService $ozonService, Request $request, $categoryId)
     {
         Log::info('Get category name: ' . $categoryId);
-        return response()->json(['name' => config('app.active_category_name')]);
+        $category = $ozonService->getCategory($categoryId);
+        Log::info('Get category response: ' . json_encode(['name' => $category['name']]));
+        if (!is_null($category)) {
+            return response()->json(['name' => $category['name']]);
+        }
+        else {
+            return response()->json([
+                'Error' => 'Category with Id=' . $categoryId . ' does not exists!'
+            ]);
+        }
     }
 
-    public function getCategoryList(Request $request)
+    public function getCategoryList(OzonService $ozonService, Request $request)
     {
         Log::info('Get category list.');
-        return response()->json([
-            'id' => config('app.active_category_id'),
-            'name' => config('app.active_category_name')
-        ]);
+        $categories = $ozonService->getCategoryList();
+        Log::info('Get category list response: ' . json_encode(['items' => $categories]));
+        if (!is_null($categories)) {
+            return response()->json(['items' => $categories]);
+        }
+        else {
+            return response()->json([]);
+        }
     }
 
     public function addCategory(Request $request)

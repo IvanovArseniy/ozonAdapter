@@ -165,7 +165,9 @@ class OzonService
                     'quantity' => $product['quantity'],
                     'price' => $product['price'],
                     'weight' => $product['weight'],
-                    'categoryIds' => isset($product['categoryIds']) ? json_encode($product['categoryIds']) : ''
+                    'default_category' => isset($product['categoryIds']) ? $product['categoryIds'][0] : null,
+                    'mall_category_id' => $product['mallCategoryId'],
+                    'mall_category_name' => $product['mallCategoryName']
                 ]); 
             if ($result) {
                 $productId = $pdo->lastInsertId();
@@ -223,12 +225,13 @@ class OzonService
         return $insertedVariants;
     }
 
-    public function createProductSchedule($productId = null)
+    public function scheduleProductCreation($productId = null)
     {
         $variants = null;
         if (is_null($productId)) {
             $variants = app('db')->connection('mysql')->select('
                 select
+                    pv.id as id,
                     pv.mall_variant_id as mallVariantId,
                     pv.price as price,
                     pv.inventory as inventory,
@@ -240,7 +243,9 @@ class OzonService
                     p.weight as weight,
                     p.unlimited as unlimited,
                     p.enabled as enabled,
-                    p.categoryIds as categoryIds
+                    p.default_category as defaultCategory,
+                    p.mall_category_id as mallCategoryId,
+                    p.mall_category_name as mallCategoryName
                 from product_variant pv
                 join product p on pv.product_id = p.id
                     where pv.ozon_product_id is null and pv.sent = 0
@@ -261,7 +266,9 @@ class OzonService
                     p.weight as weight,
                     p.unlimited as unlimited,
                     p.enabled as enabled,
-                    p.categoryIds as categoryIds
+                    p.default_category as defaultCategory,
+                    p.mall_category_id as mallCategoryId,
+                    p.mall_category_name as mallCategoryName
                 from product_variant pv
                 join product p on pv.product_id = p.id
                     where pv.ozon_product_id is null and pv.sent = 0 and pv.product_id = ' . $productId . '
@@ -272,6 +279,7 @@ class OzonService
             $items = [];
             $variantIds = [];
             foreach ($variants as $key => $variant) {
+                $ozonCategoryId = $this->getOzonCategory($variant->defaultCategory, $variant->mallCategoryId, $variant->mallCategoryName);
                 $item = $this->addProductToRequest(
                     $variant->mallVariantId,
                     $variant->sku,
@@ -282,7 +290,7 @@ class OzonService
                     $variant->weight,
                     !$variant->unlimited,
                     $variant->enabled,
-                    $variant->categoryIds,
+                    $ozonCategoryId,
                     $variant->color,
                     $variant->size,
                     $productId
@@ -294,7 +302,7 @@ class OzonService
             }
 
             $result = $this->sendProductsToOzon($items);
-            if (isset($result['task_id'])) {
+            if (isset($result['result']) && isset($result['result']['task_id'])) {
                 app('db')->connection('mysql')->table('product_variant')
                     ->whereIn('id', $variantIds)
                     ->update(['sent' => 1]);
@@ -334,9 +342,8 @@ class OzonService
         return $result;
     }
 
-    protected function addProductToRequest($mallVariantId, $sku, $description, $name, $price, $weight, $quantity, $unlimited, $enabled, $categoryIds, $color, $size, $productId)
+    protected function addProductToRequest($mallVariantId, $sku, $description, $name, $price, $weight, $quantity, $unlimited, $enabled, $ozonCategoryId, $color, $size, $productId)
     {
-        $ozonCategoryId = $this->getOzonCategory($categoryIds);
         if(!is_null($ozonCategoryId)) {
             $attributes = array([
                 'id' => config('app.ozon_product_group_attribute'),
@@ -400,7 +407,7 @@ class OzonService
         }
         else return [
             'success' => false,
-            'error' => 'Categories ' . json_encode($categoryIds) . ' doesn\'t exists! Try to update category table manually.'
+            'error' => 'Category doesn\'t exists! Try to update category table manually.'
         ];
     }
 
@@ -422,39 +429,51 @@ class OzonService
         return $attributes;
     }
 
-    public function getOzonCategory($categoryIds)
+    public function getOzonCategory($defaultCategory, $mallCategoryId, $mallCategoryName)
     {
-        if ($categoryIds) {
-            $ozonCategoryId = null;
-            foreach ($categoryIds as $key => $categoryId) {
-                $ozonCategoryId = $this->classifyCategory($categoryId);
-                if (is_null($ozonCategoryId)) {
-                    $result = app('db')->connection('mysql')->select('select oc.id as ozonCategoryId from ozon_category oc
-                        left join category c on c.ozon_category_id = oc.id where c.id = \'' . $categoryId . '\' limit 1');
-                    if (!is_null($result) && isset($result[0]->ozonCategoryId)) {
-                        $ozonCategoryId = $result[0]->ozonCategoryId;
+        $ozonCategoryId = $this->classifyCategory($mallCategoryId);
+        if (is_null($ozonCategoryId)) {
+            Log::info('Category mapping started');
+            $result = app('db')->connection('mysql')->select('select oc.id as ozonCategoryId from ozon_category oc
+                left join category c on c.ozon_category_id = oc.id where c.mall_category_id = \'' . $mallCategoryId . '\' limit 1');
+            Log::info('Category mapping 1:' . json_encode($result));
+            if (!is_null($result) && isset($result[0])) {
+                Log::info('Category mapped');
+                $ozonCategoryId = $result[0]->ozonCategoryId;
+            }
+            else {
+                Log::info('Map category by name ' . $mallCategoryName);
+                $result = app('db')->connection('mysql')->table('ozon_category')
+                    ->where('name', $mallCategoryName)
+                    ->first();
+                if ($result) {
+                    Log::info('Category mapped by name');
+                    return $result->id;
+                }
+                else {
+                    try {
+                        Log::info('Create category mapping:' . json_encode([
+                            'mall_category_id' => $mallCategoryId,
+                            'mall_category_name' => $mallCategoryName
+                        ]));
+                        app('db')->connection('mysql')->table('category')
+                            ->insert([
+                                'mall_category_id' => $mallCategoryId,
+                                'mall_category_name' => $mallCategoryName,
+                                'create_date' => date('Y-m-d\TH:i:s.u')
+                            ]);
+                        Log::info('Category with mallCategoryId=' . $mallCategoryId . ' does not mapped!');
                     }
-                    else {
-                        try {
-                            app('db')->connection('mysql')->table('category')
-                                ->insert(['id' => $categoryId]);
-                            Log::error('Category with id=' . $categoryId . ' does not mapped!');
-                        }
-                        catch (\Exception $e) {
-                            Log::info('Category ' . $categoryId . ' already exists');
-                        }
+                catch (\Exception $e) {
+                        Log::error('Category ' . $mallCategoryId . ' already exists');
                     }
                 }
             }
-            if (is_null($ozonCategoryId)) {
-                //return config('app.active_category_id');
-                return null;
-            }
-            else return $ozonCategoryId;
         }
-        else {
-            return config('app.active_category_id');
+        if (is_null($ozonCategoryId)) {
+            return $defaultCategory;
         }
+        else return $ozonCategoryId;
     }
 
     protected function classifyCategory($categoryId)
@@ -494,7 +513,7 @@ class OzonService
                 if ($result)  {
                     $attributeMapId = $pdo->lastInsertId();
                 }
-                Log::error('Attribute with value ' . $value . 'doesn\'t exists! Attribute map with id=' . $attributeMapId . ' was created.');
+                Log::error('Attribute with value ' . $value . ' doesn\'t exists! Attribute map with id=' . $attributeMapId . ' was created.');
                 return [
                     'attributeMapId' => $attributeMapId
                 ];
@@ -568,7 +587,7 @@ class OzonService
             if(!is_null($product->enabled)) {
                 app('db')->connection('mysql')->table('product')
                     ->where('id', $productId)
-                    ->update(['enabled' => $poduct->enabled]);
+                    ->update(['enabled' => $product->enabled]);
             }
 
             foreach ($product->variants as $key => $variant) {
@@ -988,57 +1007,55 @@ class OzonService
                 if (!in_array($productVariant->productId, $updatedProducts)) {
                     array_push($updatedProducts, $productVariant->productId);
                     $productInfo = $this->getProductFullInfo($productVariant->productId);
-                    Log::info('1****' . json_encode($productInfo));
 
                     if($productInfo) {
                         $updateFields = [];
                         $updateProductFields = ['update_date' => date('Y-m-d\TH:i:s.u')];
                         foreach ($productInfo['variants'] as $key => $variant) {
-                            Log::info('2****' . json_encode($variant));
-                            if (
-                                ($variant['price'] != $productVariant->price && $productVariant->mallVariantId == $variant['mallVariantId'])
-                                || $productInfo['name'] != $productVariant->name
-                                || $productInfo['imageUrl'] != $productVariant->imageUrl)
-                            {
-                                $updateFields['price'] = $variant['price'];
-                                $updateProductFields['name'] = $productInfo['name'];
-                                Log::info('3****' . json_encode($productInfo));
-                                if ($productInfo['imageUrl'] != $productVariant->imageUrl) {
-                                    app('db')->connection('mysql')->table('image')
-                                    ->where('deleted', 0)
-                                    ->where('product_variantId', $productVariant->id)
-                                    ->update(['image_url' => $productInfo['imageUrl']]);
+                            if($productVariant->mallVariantId == $variant['mallVariantId']) {
+                                if (
+                                    ($variant['price'] != $productVariant->price)
+                                    || $productInfo['name'] != $productVariant->name
+                                    || $productInfo['imageUrl'] != $productVariant->imageUrl)
+                                {
+                                    $updateFields['price'] = $variant['price'];
+                                    $updateProductFields['name'] = $productInfo['name'];
+                                    if ($productInfo['imageUrl'] != $productVariant->imageUrl) {
+                                        app('db')->connection('mysql')->table('image')
+                                        ->where('deleted', 0)
+                                        ->where('product_variantId', $productVariant->id)
+                                        ->update(['image_url' => $productInfo['imageUrl']]);
+                                    }
                                 }
-                            }
-
-                            if (count($updateFields) > 0 || count($updateProductFields) > 1) {
-                                if (count($updateFields) > 0) {
-                                    app('db')->connection('mysql')->table('product_variant')
-                                    ->where('id', $productVariant->id)
-                                    ->update($updateFields);
-                                }
-
-                                Log::info('4****' . json_encode($updateProductFields));
-                                app('db')->connection('mysql')->table('product')
-                                    ->where('id', $productVariant->productId)
-                                    ->update($updateProductFields);
-
-                                $product = [
-                                    'name' => $productInfo['name'],
-                                    'description' => $productInfo['description'],
-                                    'imageUrl' => $productInfo['imageUrl'],
-                                    'galleryImages' => $productInfo['galleryImages'],
-                                    'combinations' => $productInfo['variants']
-                                ];
     
-                                array_push($notifyingProductIds, $productVariant->productId);
-                                array_push($notifyingProducts, [
-                                    'type' => 'update',
-                                    'notified' => 0,
-                                    'data' => json_encode($product),
-                                    'product_id' => $productVariant->productId,
-                                    'mall_variant_id' => $productVariant->sku
-                                ]);
+                                if (count($updateFields) > 0 || count($updateProductFields) > 1) {
+                                    if (count($updateFields) > 0) {
+                                        app('db')->connection('mysql')->table('product_variant')
+                                        ->where('id', $productVariant->id)
+                                        ->update($updateFields);
+                                    }
+    
+                                    app('db')->connection('mysql')->table('product')
+                                        ->where('id', $productVariant->productId)
+                                        ->update($updateProductFields);
+    
+                                    $product = [
+                                        'name' => $productInfo['name'],
+                                        'description' => $productInfo['description'],
+                                        'imageUrl' => $productInfo['imageUrl'],
+                                        'galleryImages' => $productInfo['galleryImages'],
+                                        'combinations' => $productInfo['variants']
+                                    ];
+        
+                                    array_push($notifyingProductIds, $productVariant->productId);
+                                    array_push($notifyingProducts, [
+                                        'type' => 'update',
+                                        'notified' => 0,
+                                        'data' => json_encode($product),
+                                        'product_id' => $productVariant->productId,
+                                        'mall_variant_id' => $productVariant->sku
+                                    ]);
+                                }
                             }
                         }
                     }
@@ -1332,15 +1349,44 @@ class OzonService
     }
 
 
-    //Tech insert categories
+    //Categories
+    public function getCategory($id)
+    {
+        $category = app('db')->connection('mysql')->table('ozon_category')
+            ->where('id', $id)
+            ->first();
+        if ($category) {
+            return [
+                'id' => $category->id,
+                'name' => $category->name
+            ];
+        }
+        else {
+            return null;
+        }
+    }
+
+    public function getCategoryList()
+    {
+        $categories = app('db')->connection('mysql')->table('ozon_category')
+            ->select('id', 'name')
+            ->get();
+        if ($categories) {
+            return $categories;
+        }
+        else {
+            return null;
+        }
+    }
+
     public function insertCategories()
     {
         $response = $this->sendData($this->categoryListUrl, null);
         $result = json_decode($response, true);
-        $this->insertChildCategories($result['result']);
+        $this->insertChildCategories($result['result'], '');
     }
 
-    protected function insertChildCategories($categories)
+    protected function insertChildCategories($categories, $path)
     {
         foreach ($categories as $key => $category) {
             Log::info('Category inserted: ' . $category['category_id'] . ' ' . $category['title']);
@@ -1349,7 +1395,8 @@ class OzonService
                     $categoryResult = app('db')->connection('mysql') ->table('ozon_category')
                     ->insert([
                         'id' => $category['category_id'],
-                        'name' => $category['title']
+                        'name' => $category['title'],
+                        'path' => trim(($path . ' -> ' . $category['title']), ' -> ')
                     ]);
                 } catch (\Exception $e) {
                     $categoryResult = true;
@@ -1366,6 +1413,8 @@ class OzonService
                                     $attributeResult = app('db')->connection('mysql')->table('attribute')
                                         ->insert([
                                             'id' => $attribute['id'],
+                                            'name' => $attribute['name'],
+                                            'description' => $attribute['description'],
                                             'is_collection' => $attribute['is_collection'],
                                             'required' => $attribute['required']
                                         ]);
@@ -1417,7 +1466,7 @@ class OzonService
                 }
             }
             else {
-                 $this->insertChildCategories($category['children']);
+                 $this->insertChildCategories($category['children'], ($path . ' -> ' . $category['title']));
             }
         }
     }
@@ -1441,7 +1490,7 @@ class OzonService
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         Log::info('Url: ' . $this->baseUrl . $url);
         Log::info('Headers: ' . json_encode($headers));
-        Log::info('Url: ' . json_encode($data));
+        Log::info('Data: ' . json_encode($data));
         $response = curl_exec($ch);
         curl_close($ch);
         return $response;

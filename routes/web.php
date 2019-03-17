@@ -36,8 +36,10 @@ $router->group(['prefix' => '1/products', 'middleware' => 'auth'], function() us
 });
 
 $router->group(['prefix' => '1/tech', 'middleware' => 'auth'], function() use ($router) {
-    $router->get('/sync', 'ProductController@syncProducts');
-    $router->get('/setIds', 'ProductController@setProductExternalId');
+    $router->get('/product/sync', 'ProductController@syncProducts');
+    $router->get('/product/create', 'ProductController@scheduleProductCreation');
+    $router->get('/product/setIds', 'ProductController@setProductExternalId');
+    $router->get('/product/notify', 'ProductController@notifyProducts');
 });
 
 $router->group(['prefix' => '1/orders', 'middleware' => 'auth'], function() use ($router) {
