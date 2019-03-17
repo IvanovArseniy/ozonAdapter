@@ -433,26 +433,20 @@ class OzonService
     {
         $ozonCategoryId = $this->classifyCategory($mallCategoryId);
         if (is_null($ozonCategoryId)) {
-            Log::info('Category mapping started');
             $result = app('db')->connection('mysql')->select('select oc.id as ozonCategoryId from ozon_category oc
                 left join category c on c.ozon_category_id = oc.id where c.mall_category_id = \'' . $mallCategoryId . '\' limit 1');
-            Log::info('Category mapping 1:' . json_encode($result));
             if (!is_null($result) && isset($result[0])) {
-                Log::info('Category mapped');
                 $ozonCategoryId = $result[0]->ozonCategoryId;
             }
             else {
-                Log::info('Map category by name ' . $mallCategoryName);
                 $result = app('db')->connection('mysql')->table('ozon_category')
                     ->where('name', $mallCategoryName)
                     ->first();
                 if ($result) {
-                    Log::info('Category mapped by name');
                     return $result->id;
                 }
                 else {
                     try {
-                        Log::info('Create category mapping:' . json_encode([
                             'mall_category_id' => $mallCategoryId,
                             'mall_category_name' => $mallCategoryName
                         ]));
@@ -464,7 +458,7 @@ class OzonService
                             ]);
                         Log::info('Category with mallCategoryId=' . $mallCategoryId . ' does not mapped!');
                     }
-                catch (\Exception $e) {
+                    catch (\Exception $e) {
                         Log::error('Category ' . $mallCategoryId . ' already exists');
                     }
                 }
