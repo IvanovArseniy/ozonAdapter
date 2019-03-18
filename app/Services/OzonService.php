@@ -621,28 +621,28 @@ class OzonService
             }
 
             foreach ($product['variants'] as $key => $variant) {
-                if (!is_null($variant->price) || !is_null($variant->inventory)) {
+                if (!is_null($variant['price']) || !is_null($variant['inventory'])) {
                     $item = [];
-                    if (!is_null($product->name)) {
-                        $item->name = $product->name;
+                    if (!is_null($product['name'])) {
+                        $item['name'] = $product['name'];
                     }
-                    if (!is_null($product->description)) {
-                        $item->description = $product->description;
+                    if (!is_null($product['description'])) {
+                        $item['description'] = $product['description'];
                     }
-                    if (!is_null($product->enabled)) {
-                        $item->enabled = $product->enabled;
+                    if (!is_null($product['enabled'])) {
+                        $item['enabled'] = $product['enabled'];
                     }
-                    if (!is_null($variant->price)) {
-                        $item->price = $variant->price;
+                    if (!is_null($variant['price'])) {
+                        $item['price'] = $variant['price'];
                     }
-                    if (!is_null($variant->inventory)) {
-                        $item->inventory = $variant->inventory;
+                    if (!is_null($variant['inventory'])) {
+                        $item['quantity'] = $variant['inventory'];
                     }
-                    if (!is_null($variant->color)) {
-                        $item->color = $variant->color;
+                    if (!is_null($variant['color'])) {
+                        $item['color'] = $variant['color'];
                     }
-                    if (!is_null($variant->size)) {
-                        $item->size = $variant->size;
+                    if (!is_null($variant['size'])) {
+                        $item['size'] = $variant['size'];
                     }
                     array_push($result, $this->updateOzonProduct($item, $productId, $variant->mallVariantId));
                 }
@@ -657,13 +657,13 @@ class OzonService
         $result = [];
         if (isset($product['variants']) && count($product['variants']) > 0) {
             foreach ($product['variants'] as $key => $variant) {
-                if (!is_null($variant->price) || !is_null($variant->inventory)) {
+                if (!is_null($variant['price']) || !is_null($variant['inventory'])) {
                     $item = [];
-                    if (!is_null($variant->price)) {
-                        $item->price = $variant->price;
+                    if (!is_null($variant['price'])) {
+                        $item['price'] = $variant['price'];
                     }
-                    if (!is_null($variant->inventory)) {
-                        $item->inventory = $variant->inventory;
+                    if (!is_null($variant['inventory'])) {
+                        $item['quantity'] = $variant['inventory'];
                     }
                     array_push($result, $this->updateOzonProduct($item, $productId, $variant->mallVariantId));
                 }
@@ -749,11 +749,11 @@ class OzonService
                 $response = $this->deactivateProduct($ozonProductResult['result']['Id']);
             }
 
-            if (!is_null($product->price)) {
+            if (!is_null($product['price'])) {
                 $priceResult = $this->setPrices([
                     'product_id' => $ozonProductResult['result']['Id'],
                     'price' => $product['price'],
-                    'old_price' => $ozonProductResult['result']['old_price'],
+                    'old_price' => $ozonProductResult['result']['price'],
                     'vat' => $ozonProductResult['result']['vat']
                 ]);
                 $updateFields['price'] = $product['price'];
