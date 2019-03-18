@@ -49,7 +49,8 @@ class CategoryController extends BaseController
         return response()->json(['name' => config('app.active_category_name')]);
     }
 
-    public function uploadCategories(OzonService $ozonService) {
+    public function uploadCategories() {
+        $ozonService = new OzonService ();
         $ozonService->insertCategories();
         return response()->json(['Result' => 'Ok']);
     }

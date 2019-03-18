@@ -55,11 +55,12 @@ class OzonService
     {
         $products = app('db')->connection('mysql')->
             select('
-                select pv.ozon_product_id as ozonProductId, pv.mall_variant_id as mallVariantId, p.name, p.description, i.image_url as imageUrl, pv.color, pv.size
+                select pv.id as id, pv.ozon_product_id as ozonProductId, pv.mall_variant_id as mallVariantId, p.name, p.description, i.image_url as imageUrl, pv.color, pv.size
                     from product_variant pv
                     inner join product p on p.id = pv.product_id
-                    left join image i on (i.product_variant_id = pv.id and i.default = 1)
-                    where pv.deleted = 0 and pv.product_id = ' . $productId . '
+                    left join product_variant_image pvi on pv.id = pvi.product_variant_id
+                    left join image i on i.id = pvi.image_id
+                    where pv.deleted = 0 and i.deleted = 0 and i.is_default = 1 and pv.product_id = ' . $productId . '
             ');
         $galleryImages = array();
         $variants = array();
@@ -74,21 +75,19 @@ class OzonService
                 $response = json_decode($response, true);
                 if (isset($response['result'])) {
                     $name = $response['result']['name'];
-                    $imageResult = $this->getImages($response['result']['images']);
+                    $imageResult = $this->getImages($response['result']['images'], $product->id);
                     foreach ($imageResult as $key => $image) {
-                        if ($image->default) {
-                            $mainImage = $image->file_name;
+                        if ($image->is_default) {
+                            $mainImage = $image->imageUrl;
                         }
                         else {
                             array_push($galleryImages, [
                                 'id' => $image->id,
-                                'imageUrl' => $image->file_name
+                                'imageUrl' => $image->imageUrl
                             ]);
                         }
                     }
-                }
 
-                if (isset($response['result'])) {
                     $description = $product->description;
                     array_push($variants, [
                         'mallVariantId' => $product->mallVariantId,
@@ -98,18 +97,25 @@ class OzonService
                         'price' => $response['result']['price'],
                     ]);
                 }
+
+                if (count($variants) > 0) {
+                    return [
+                        'name' => $name,
+                        'imageUrl' => $mainImage,
+                        'description' => $description,
+                        "galleryImages" => $galleryImages,
+                        'variants' => $variants
+                    ];
+                }
+                else {
+                    return [
+                        'Error' => 'Product with id=' . $productId . ' doesn\'t found in ozon!'
+                    ];
+                }
             }
         }
         else return [
             'Error' => 'Product with id=' . $productId . ' doesn\'t exists!'
-        ];
-
-        return [
-            'name' => $name,
-            'imageUrl' => $mainImage,
-            'description' => $description,
-            "galleryImages" => $galleryImages,
-            'variants' => $variants
         ];
     }
 
@@ -245,11 +251,15 @@ class OzonService
                     p.enabled as enabled,
                     p.default_category as defaultCategory,
                     p.mall_category_id as mallCategoryId,
-                    p.mall_category_name as mallCategoryName
+                    p.mall_category_name as mallCategoryName,
+                    i.image_url as imageUrl
                 from product_variant pv
-                join product p on pv.product_id = p.id
-                    where pv.ozon_product_id is null and pv.sent = 0
+                left join product p on pv.product_id = p.id
+                left join product_variant_image pvi on pv.id = pvi.product_variant_id
+                left join image i on i.id = pvi.image_id
+                    where pv.deleted = 0 and i.deleted = 0 and i.is_default = 1 and pv.ozon_product_id is null and pv.sent = 0
             ');
+
         }
         else {
             $variants = app('db')->connection('mysql')->select('
@@ -268,36 +278,50 @@ class OzonService
                     p.enabled as enabled,
                     p.default_category as defaultCategory,
                     p.mall_category_id as mallCategoryId,
-                    p.mall_category_name as mallCategoryName
-                from product_variant pv
-                join product p on pv.product_id = p.id
-                    where pv.ozon_product_id is null and pv.sent = 0 and pv.product_id = ' . $productId . '
+                    p.mall_category_name as mallCategoryName, 
+                    i.image_url as imageUrl
+                    from product_variant pv
+                    left join product p on pv.product_id = p.id
+                    left join product_variant_image pvi on pv.id = pvi.product_variant_id
+                    left join image i on i.id = pvi.image_id
+                    where pv.deleted = 0 and i.deleted = 0 and i.is_default = 1 and pv.ozon_product_id is null and pv.sent = 0 and pv.product_id = ' . $productId . '
             ');
         }
 
+        $errorsCategories = [];
+        $errorAttributes = [];
         if ($variants) {
             $items = [];
             $variantIds = [];
             foreach ($variants as $key => $variant) {
-                $ozonCategoryId = $this->getOzonCategory($variant->defaultCategory, $variant->mallCategoryId, $variant->mallCategoryName);
-                $item = $this->addProductToRequest(
-                    $variant->mallVariantId,
-                    $variant->sku,
-                    $variant->description,
-                    $variant->name,
-                    $variant->price,
-                    $variant->inventory,
-                    $variant->weight,
-                    !$variant->unlimited,
-                    $variant->enabled,
-                    $ozonCategoryId,
-                    $variant->color,
-                    $variant->size,
-                    $productId
-                );
-                if (!isset($item['success'])) {
-                    array_push($items, $item);
-                    array_push($variantIds, $variant->id);
+                if (!is_null($variant->imageUrl)) {
+                    $categoryResult = $this->getOzonCategory($variant->defaultCategory, $variant->mallCategoryId, $variant->mallCategoryName);
+                    if (isset($categoryResult['error'])) {
+                        array_push($errorsCategories, $categoryResult['error']);
+                    }
+                    $item = $this->addProductToRequest(
+                        $variant->mallVariantId,
+                        $variant->sku,
+                        $variant->description,
+                        $variant->name,
+                        $variant->price,
+                        $variant->inventory,
+                        $variant->weight,
+                        !$variant->unlimited,
+                        $variant->enabled,
+                        $categoryResult['categoryId'],
+                        $variant->color,
+                        $variant->size,
+                        $variant->imageUrl,
+                        $productId
+                    );
+                    if (!isset($item['success'])) {
+                        array_push($items, $item);
+                        array_push($variantIds, $variant->id);
+                    }
+                    else {
+                        array_push($errorAttributes, $item['error']);
+                    }
                 }
             }
 
@@ -308,6 +332,10 @@ class OzonService
                     ->update(['sent' => 1]);
             }
         }
+        return [
+            'categories' => $errorsCategories,  
+            'attributes' => $errorAttributes
+        ];
     }
 
     public function setOzonProductId()
@@ -316,8 +344,8 @@ class OzonService
             ->whereNull('ozon_product_id')
             ->get();
 
+        $errors = [];
         foreach ($variants as $key => $variant) {
-
             $response = $this->getProductFromOzonByOfferId($variant->mall_variant_id);
             $ozonProduct = json_decode($response, true);
             if(isset($ozonProduct['result'])) {
@@ -330,7 +358,12 @@ class OzonService
                     'stock' => $variant->inventory
                 ]);
             }
+            else {
+                array_push($errors, 'Product with id=' . $variant->product_id . ' not created yet in ozon');
+            }
         }
+
+        return $errors;
     }
 
     protected function sendProductsToOzon($items) {
@@ -342,7 +375,7 @@ class OzonService
         return $result;
     }
 
-    protected function addProductToRequest($mallVariantId, $sku, $description, $name, $price, $weight, $quantity, $unlimited, $enabled, $ozonCategoryId, $color, $size, $productId)
+    protected function addProductToRequest($mallVariantId, $sku, $description, $name, $price, $weight, $quantity, $unlimited, $enabled, $ozonCategoryId, $color, $size, $mainImageUrl, $productId)
     {
         if(!is_null($ozonCategoryId)) {
             $attributes = array([
@@ -379,7 +412,7 @@ class OzonService
                     'weight_unit' => 'g',
                     'quantity' => $quantity,
                     'images' => array([
-                        'file_name' => 'https://ozon-st.cdn.ngenix.net/multimedia/c1200/1022555115.jpg',
+                        'file_name' => $mainImageUrl,
                         'default' => true
                     ]),
                     'attributes' => $attributes,
@@ -406,8 +439,7 @@ class OzonService
             }
         }
         else return [
-            'success' => false,
-            'error' => 'Category doesn\'t exists! Try to update category table manually.'
+            'success' => false
         ];
     }
 
@@ -431,6 +463,7 @@ class OzonService
 
     public function getOzonCategory($defaultCategory, $mallCategoryId, $mallCategoryName)
     {
+        $error = null;
         $ozonCategoryId = $this->classifyCategory($mallCategoryId);
         if (is_null($ozonCategoryId)) {
             $result = app('db')->connection('mysql')->select('select oc.id as ozonCategoryId from ozon_category oc
@@ -447,16 +480,14 @@ class OzonService
                 }
                 else {
                     try {
-                            'mall_category_id' => $mallCategoryId,
-                            'mall_category_name' => $mallCategoryName
-                        ]));
                         app('db')->connection('mysql')->table('category')
                             ->insert([
                                 'mall_category_id' => $mallCategoryId,
                                 'mall_category_name' => $mallCategoryName,
                                 'create_date' => date('Y-m-d\TH:i:s.u')
                             ]);
-                        Log::info('Category with mallCategoryId=' . $mallCategoryId . ' does not mapped!');
+                        $error = 'Category with mallCategoryId=' . $mallCategoryId . ' does not mapped!';
+                        Log::info($error);
                     }
                     catch (\Exception $e) {
                         Log::error('Category ' . $mallCategoryId . ' already exists');
@@ -465,9 +496,14 @@ class OzonService
             }
         }
         if (is_null($ozonCategoryId)) {
-            return $defaultCategory;
+            return [
+                'categoryId' => $defaultCategory,
+                'error' => $error
+            ];
         }
-        else return $ozonCategoryId;
+        else return [
+            'categoryId' => $ozonCategoryId
+        ];
     }
 
     protected function classifyCategory($categoryId)
@@ -576,7 +612,7 @@ class OzonService
     public function updateProduct($product, $productId)
     {
         $result = [];
-        if (!is_null($product->variants)) {
+        if (isset($product['variants']) && count($product['variants']) > 0) {
 
             if(!is_null($product->enabled)) {
                 app('db')->connection('mysql')->table('product')
@@ -584,8 +620,8 @@ class OzonService
                     ->update(['enabled' => $product->enabled]);
             }
 
-            foreach ($product->variants as $key => $variant) {
-                if (!is_null($variant->price) && !is_null($variant->inventory)) {
+            foreach ($product['variants'] as $key => $variant) {
+                if (!is_null($variant->price) || !is_null($variant->inventory)) {
                     $item = [];
                     if (!is_null($product->name)) {
                         $item->name = $product->name;
@@ -616,51 +652,59 @@ class OzonService
         return $result;
     }
 
+    public function updateProductLight($product, $productId)
+    {
+        $result = [];
+        if (isset($product['variants']) && count($product['variants']) > 0) {
+            foreach ($product['variants'] as $key => $variant) {
+                if (!is_null($variant->price) || !is_null($variant->inventory)) {
+                    $item = [];
+                    if (!is_null($variant->price)) {
+                        $item->price = $variant->price;
+                    }
+                    if (!is_null($variant->inventory)) {
+                        $item->inventory = $variant->inventory;
+                    }
+                    array_push($result, $this->updateOzonProduct($item, $productId, $variant->mallVariantId));
+                }
+            }
+        }
+        
+        return $result;
+
+    }
+
     protected function updateOzonProduct($product, $productId, $mallVariantId)
     {
         $ozonProductResult = $this->getProductInfo($productId, $mallVariantId);
-        if (!is_null($ozonProductResult->result)) {
+        if (!is_null($ozonProductResult['result'])) {
             $interactionId = mt_srand();
             $updateFields = array();
-            if (!is_null($product->color)) {
-                $updateFields['color'] = $product->color;
+            if (isset($product['color'])) {
+                $updateFields['color'] = $product['color'];
             }
-            if (!is_null($product->size)) {
-                $updateFields['size'] = $product->size;
+            if (isset($product['size'])) {
+                $updateFields['size'] = $product['size'];
             }
-            $request = ['product_id' => $ozonProductResult->result->Id];
+            $request = ['product_id' => $ozonProductResult['result']['id']];
             $updateNeeded = false;
-            if (!is_null($product->name)) {
-                $request->name = $product->name;
-                $updateFields['name'] = $product->name;
+            if (isset($product['name'])) {
+                $request['name'] = $product['name'];
+                $updateFields['name'] = $product['name'];
                 $updateNeeded = true;
             }
-            if (!is_null($product->description)) {
-                $request->description = $product->description;
-                $updateFields['description'] = $product->description;
+            if (isset($product['description'])) {
+                $request['description'] = $product['description'];
+                $updateFields['description'] = $product['description'];
                 $updateNeeded = true;
             }
-            if(!is_null($product->images)) {
-                $imagesResult = $this->compareImages(
-                    $ozonProductResult->result->images,
-                    $product->images,
-                    $ozonProductResult->result->productVariant->id
-                );
-
-                foreach ($imageResult as $key => $image) {
-                    if($image->default) {
-                        $updateFields['image_url'] = $image->file_name;
-                    }
-                }
-
-                if (count($imagesResult->images) > 0) {
-                    $request->images = $imagesResult->images;
-                    $updateNeeded = true;
-                }
+            if(isset($product['images']) && count($product['images']) > 0) {
+                $request['images'] = $imagesResult['images'];
+                $updateNeeded = true;
             }
 
             $attributes = array();
-            if (!is_null($product->color)) {
+            if (isset($product['color'])) {
                 $colorAttribute = null;
                 if (!is_null($color)) {
                     $colorAttribute = $this->getAttribute($ozonCategoryId, $color);
@@ -669,7 +713,7 @@ class OzonService
                     }
                 }
             }
-            if (!is_null($product->size)) {
+            if (isset($product['size'])) {
                 $sizeAttribute = null;
                 if (!is_null($size)) {
                     $sizeAttribute = $this->getAttribute($ozonCategoryId, $size);
@@ -679,7 +723,7 @@ class OzonService
                 }
             }
             if (count($attributes) > 0) {
-                $request->attributes = $attributes;
+                $request['attributes'] = $attributes;
                 $updateNeeded = true;
             }
 
@@ -690,29 +734,29 @@ class OzonService
                 $result = json_decode($response, true);
             }
 
-            if (!is_null($product->quantity)) {
+            if (isset($product['quantity'])) {
                 $quanitiyResult = $this->setQuantity([
-                    'product_id' => $ozonProductResult->result->Id,
-                    'stock' => $product->quantity
+                    'product_id' => $ozonProductResult['result']['Id'],
+                    'stock' => $product['quantity']
                 ]);
                 $updateNeeded = true;
             }
 
-            if (!is_null($product->enabled) && $product->enabled) {
-                $response = $this->activateProduct($ozonProductResult->result->Id);
+            if (isset($product['enabled']) && $product['enabled']) {
+                $response = $this->activateProduct($ozonProductResult['result']['Id']);
             }
-            else if (!is_null($product->enabled) && !$product->enabled){
-                $response = $this->deactivateProduct($ozonProductResult->result->Id);
+            else if (isset($product['enabled']) && !$product['enabled']){
+                $response = $this->deactivateProduct($ozonProductResult['result']['Id']);
             }
 
             if (!is_null($product->price)) {
                 $priceResult = $this->setPrices([
-                    'product_id' => $ozonProductResult->result->Id,
-                    'price' => $product->price,
-                    'old_price' => $ozonProductResult->result->old_price,
-                    'vat' => $ozonProductResult->result->vat
+                    'product_id' => $ozonProductResult['result']['Id'],
+                    'price' => $product['price'],
+                    'old_price' => $ozonProductResult['result']['old_price'],
+                    'vat' => $ozonProductResult['result']['vat']
                 ]);
-                $updateFields['price'] = $product->price;
+                $updateFields['price'] = $product['price'];
                 $updateNeeded = true;
             }
 
@@ -724,7 +768,7 @@ class OzonService
                     ->update($updateFields);
             }
 
-            return ['productId' => $productId, 'imageIds' => $imagesResult->imageIds];
+            return ['productId' => $productId, 'imageIds' => $imagesResult['imageIds']];
         }
         else return $ozonProductResult;
     }
@@ -772,28 +816,45 @@ class OzonService
 
     public function addMainImage($productId, $imageUrl)
     {
-        $result = [];
-
         $productVariants = $this->getProductVariants($productId);
-        if (!is_null($productVariants)) {
-            $imageId = $this->saveImage([
-                'product_id' => $productId,
-                'default' => true,
-                'image_url' => $imageUrl,
+        if (!is_null($productVariants) && count($productVariants) > 0) {
+            $newImage = [
+                'is_default' => true,
+                'imageUrl' => $imageUrl,
                 'deleted' => 0
-            ]);
+            ];
 
+            $firstProductVariantId = $productVariants[0]->id;
+            $imagesResult = $this->compareImages(
+                [$newImage],
+                $firstProductVariantId
+            );
+
+            $relations = [];
             foreach ($productVariants as $key => $variant) {
-                if (!is_null($variant->ozonProductId)) {
-                    $updateResult = $this->updateOzonProduct(['image' => array([
-                        'file_name' => $image->externalUrl,
-                        'default' => true
-                    ])], $productId, $variant->mallVariantId);
+                if ($variant->id != $firstProductVariantId) {
+                    array_push($relations, [
+                        'image_id' => $imagesResult['imageIds'][0],
+                        'product_variant_id' => $variant->id
+                    ]);
                 }
-                array_push($result, $updateResult['imageIds']);
+                if (!is_null($variant->ozonProductId)) {
+                    $updateResult = $this->updateOzonProduct(['images' => $imagesResult['images']], $productId, $variant->mallVariantId);
+                }
             }
+
+            app('db')->connection('mysql')->table('product_variant_image')
+                ->insert($relations);
+
+            return $imagesResult['imageIds'][0];
         }
-        return $result;
+        else {
+            Log::error('Product with Id=' . $productId . ' does not exists!');
+            return [
+                'Error' => 'Product with Id=' . $productId . ' does not exists!'
+            ];
+        }
+        return $imageId;
     }
 
     public function addGalleryImage($productId, $image)
@@ -802,10 +863,15 @@ class OzonService
         $productVariants = $this->getProductVariants($productId);
         if (!is_null($productVariants)) {
             foreach ($productVariants as $key => $variant) {
-                $result = $this->updateOzonProduct(['image' => array([
-                    'file_name' => $image->externalUrl,
-                    'default' => false
-                ])], $productId, $variant->mallVariantId);
+                $imagesResult = $this->compareImages(
+                    [
+                        'is_default' => true,
+                        'imageUrl' => $image,
+                        'deleted' => 0
+                    ],
+                    $variant->id
+                );
+                $result = $this->updateOzonProduct(['images' => $imagesResult['images']],$productId, $variant->mallVariantId);
                 array_push($result, $updateResult['imageIds']);
             }
         }
@@ -817,7 +883,7 @@ class OzonService
         return app('db')->connection('mysql')->table('product_variant')
             ->where('product_id', $productId)
             ->where('deleted', 0)
-            ->select('ozon_product_id as ozonProductId', 'mall_variant_id as mallVariantId')
+            ->select('ozon_product_id as ozonProductId', 'mall_variant_id as mallVariantId', 'id')
             ->get();
     }
 
@@ -828,13 +894,18 @@ class OzonService
             ->where('product_id', $productId)
             ->where('mall_variant_id', $mallVariantId)
             ->where('deleted', 0)
-            ->select('ozon_product_id as ozonProductId', 'mall_variant_id as mallVariantId')
+            ->select('ozon_product_id as ozonProductId', 'mall_variant_id as mallVariantId', 'id')
             ->get();
         if (!is_null($productVariants) && count($productVariants) > 0) {
-            $updateResult = $this->updateOzonProduct(['image' => array([
-                'file_name' => $image->externalUrl,
-                'default' => false
-            ])], $productId, $mallVariantId);
+            $imagesResult = $this->compareImages(
+                [
+                    'is_default' => true,
+                    'imageUrl' => $image,
+                    'deleted' => 0
+                ],
+                $variant[0]->id
+            );
+            $updateResult = $this->updateOzonProduct(['images' => $imagesResult['images']], $productId, $mallVariantId);
             array_push($result, $updateResult['imageIds']);
         }
         return $result;
@@ -847,7 +918,7 @@ class OzonService
         if (!is_null($productVariants)) {
             foreach ($productVariants as $key => $variant) {
                 $ozonProductInfo = $this->getProductInfo($productId, $variant->mallVariantId);
-                $imageResult = $this->getImages($ozonProductInfo->result->images);
+                $imageResult = $this->getImages($ozonProductInfo->result->images, $variant->id);
                 $images = array();
                 $result = array();
                 foreach ($imageResult as $key => $image) {
@@ -857,7 +928,7 @@ class OzonService
                         ]);
                     }
                     else if($image->id == $imageId && count($imageResult) > 1) {
-                        if ($image->default) {
+                        if ($image->is_default) {
                             array_push($result, [
                                 'Error' => 'Can\'t delete main image'
                             ]);
@@ -869,12 +940,16 @@ class OzonService
                     }
                     else {
                         array_push($images, [
-                            'file_name' => $image->file_name,
-                            'default' => $image->default
+                            'imageUrl' => $image->imageUrl,
+                            'is_default' => $image->is_default
                         ]);
                     }
                 }
-                $updateResult = $this->updateOzonProduct(['images' => $images], $productId, $variant->mallVariantId);
+                $imagesResult = $this->compareImages(
+                    $images,
+                    $variant->id
+                );
+                $updateResult = $this->updateOzonProduct(['images' => $imagesResult['images']], $productId, $variant->mallVariantId);
                 array_push($result, $updateResult['imageIds']);
             }
         }
@@ -882,27 +957,28 @@ class OzonService
         return $result;
     }
 
-    protected function compareImages($existedImages, $newImages, $productVariantId)
+    protected function compareImages($newImages, $productVariantId)
     {
         $resultImages = $newImages;
         $insertedImages = array();
 
-        $imageResult = $this->getImages($existedImages);
-        if ($imageResult) {
+        $imageResult = $this->getProductVariantImages($productVariantId);
+        if (count($newImages) > 0) {
             $newMainImageExists = false;
             foreach ($newImages as $key => $newImage) {
-                if ($newImage->default) {
+                if ($newImage['is_default']) {
                     $newMainImageExists = true;
                 }
 
                 $imageExists = false;
                 foreach ($imageResult as $key => $image) {
-                    if($mage->file_name == $newImage->file_name) {
+                    if($image->imageUrl == $newImage['imageUrl']) {
                         $imageExists = true;
                     }
                 }
-                if (!$image_exists) {
-                    $newImageId = $this->saveImage($productVariantId, $newImage);
+
+                if (!$imageExists) {
+                    $newImageId = $this->saveImageWithRelation($productVariantId, $newImage);
                     array_push($insertedImages, $newImageId);
                 }
             }
@@ -910,7 +986,7 @@ class OzonService
             foreach ($imageResult as $key => $image) {
                 $imageInArray = false;
                 foreach ($newImages as $key => $newImage) {
-                    if ($newImage->file_name == $image->file_name) {
+                    if ($newImage['imageUrl'] == $image->imageUrl) {
                         $imageInArray = true;
                         break;
                     }
@@ -918,42 +994,64 @@ class OzonService
                 if(!$imageInArray) {
                     if($newMainImageExists) {
                         array_push($resultImages, [
-                            'file_name' => $image->file_name,
+                            'file_name' => $image->imageUrl,
                             'default' => false
                         ]);
                     }
                     else {
                         array_push($resultImages, [
-                            'file_name' => $image->file_name,
-                            'default' => $image->default
+                            'file_name' => $image->imageUrl,
+                            'default' => $image->is_default
                         ]);
                     }
                 }
             }
             return ['images' => $resultImages, 'imageIds' => $insertedImages];
         }
-
-
-        $imageResult = $this->saveImage($ozonProductResult->productVariant->id, $product->images[0]);
+        else return ['images' => [], 'imageIds' => []];
     }
 
-    protected function getImages($imageFilenames) {
+    protected function getImages($imageFilenames, $productVariantId) {
         $imageResult = app('db')->connection('mysql')
-            ->select('select * from image where deleted = 0 and image_url IN (\'' . implode('\',\'', $imageFilenames) . '\')');
+            ->select('
+                select i.image_url as imageUrl, i.is_default as is_default, i.id as id
+                from image i
+                inner join product_variant_image pvi on i.id = pvi.image_id
+                where 
+                    i.deleted = 0
+                    and pvi.product_variant_id = ' . $productVariantId . '
+                    and image_url IN (\'' . implode('\',\'', $imageFilenames) . '\')
+            ');
         if ($imageResult) {
             return $imageResult;
         }
-        else return array();
+        else return [];
     }
 
-    protected function saveImage($productVariantId, $image)
+
+    protected function getProductVariantImages($productVariantId) {
+        $imageResult = app('db')->connection('mysql')
+            ->select('
+                select i.image_url as imageUrl, i.is_default as is_default, i.id as id
+                from image i
+                inner join product_variant_image pvi on i.id = pvi.image_id
+                where 
+                    i.deleted = 0
+                    and pvi.product_variant_id = ' . $productVariantId . '
+            ');
+        if ($imageResult) {
+            return $imageResult;
+        }
+        else return [];
+    }
+
+    protected function saveImage($image)
     {
         $pdo = app('db')->connection('mysql')->getPdo();
         $result = app('db')->connection('mysql')->table('image')
             ->insert([
-                'image_url' => $image->file_name,
-                'default' => $image->default,
-                'product_variant_id' => $productVariantId,
+                'image_url' => $image['imageUrl'],
+                'is_default' => $image['is_default'] ? 1 : 0,
                 'deleted' => 0
             ]);
 
@@ -963,7 +1061,20 @@ class OzonService
         else
         {
             Log::error('Insert image to database failed' . $result);
-            return $result;
+            return null;
+        }
+        return $imageId;
+    }
+
+    protected function saveImageWithRelation($productVariantId, $image)
+    {
+        $imageId = $this->saveImage($image);
+        if (!is_null($imageId)) {
+            app('db')->connection('mysql')->table('product_variant_image')
+                ->insert([
+                    'image_id' => $imageId,
+                    'product_variant_id' => $productVariantId
+                ]);
         }
         return $imageId;
     }
@@ -990,8 +1101,9 @@ class OzonService
                 p.sku as sku
             from product p
             inner join product_variant pv on p.id = pv.product_id
-            left join image i on (i.product_variant_id = pv.id and i.default = 1)
-            where product_id in (' . implode(',', $productResult) . ')
+            left join product_variant_image pvi on pv.id = pvi.product_variant_id
+            left join image i on i.id = pvi.image_id
+            where pv.deleted = 0 and i.deleted = 0 and i.is_default = 1 and product_id in (' . implode(',', $productResult) . ')
         ');
 
         $notifyingProducts = [];
@@ -1383,7 +1495,6 @@ class OzonService
     protected function insertChildCategories($categories, $path)
     {
         foreach ($categories as $key => $category) {
-            Log::info('Category inserted: ' . $category['category_id'] . ' ' . $category['title']);
             if(is_null($category['children'])) {
                 try {
                     $categoryResult = app('db')->connection('mysql') ->table('ozon_category')
@@ -1401,7 +1512,6 @@ class OzonService
                     foreach ($result['result'] as $key => $attribute) {
                         if(!in_array($attribute['id'], $this->attributes)) {
                             array_push($this->attributes, $attribute['id']);
-                            Log::info('Attribute inserted: ' . $attribute['id']);
                             if($attribute['type'] == 'option') {
                                 try {
                                     $attributeResult = app('db')->connection('mysql')->table('attribute')
@@ -1445,7 +1555,6 @@ class OzonService
                         }
                         else {
                             try {
-                                Log::info('Attribute exists: ' . $attribute['id']);
                                 app('db')->connection('mysql')->table('ozon_category_attribute')
                                     ->insert([
                                         'attribute_id' => $attribute['id'],

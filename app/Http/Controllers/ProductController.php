@@ -25,8 +25,8 @@ class ProductController extends BaseController
         Log::info('Create product:'. json_encode($request->getContent()));
         if (!is_null($product) && isset($product['name']) && isset($product['variants']) && count($product['variants']) > 0) {
             $result = $ozonService->createNewProduct($product);
-            $ozonService->scheduleProductCreation($result['id']);
-            $ozonService->setOzonProductId();
+            // $ozonService->scheduleProductCreation($result['id']);
+            // $ozonService->setOzonProductId();
             Log::info('Create product response:'. json_encode($result));
             return response()->json($result);
         }
@@ -38,15 +38,17 @@ class ProductController extends BaseController
     public function scheduleProductCreation(OzonService $ozonService)
     {
         Log::info('Product creation scheduled. Start');
-        $ozonService->scheduleProductCreation();
+        $response = $ozonService->scheduleProductCreation();
         Log::info('Product creation scheduled. Finish');
+        return response()->json($response);
     }
 
     public function setProductExternalId(OzonService $ozonService)
     {
         Log::info('Set product external Ids started');
-        $ozonService->setOzonProductId();
+        $response = $ozonService->setOzonProductId();
         Log::info('Set product external Ids finished');
+        return response()->json($response);
     }
 
     public function createProductCombination(OzonService $ozonService, Request $request, $productId)
@@ -61,7 +63,7 @@ class ProductController extends BaseController
     public function updateProduct(OzonService $ozonService, Request $request)
     {
         $productId = $request->input('productId');
-        $product = json_decode($request->getContent());
+        $product = json_decode($request->getContent(), true);
         Log::info('Update product:'. json_encode($request->getContent()));
         $result = $ozonService->updateProduct($product, $productId);
         Log::info('Update product response:'. json_encode($result));
@@ -77,12 +79,11 @@ class ProductController extends BaseController
         return response()->json($result);
     }
 
-    public function addMainImage(OzonService $ozonService, Request $request)
+    public function addMainImage(OzonService $ozonService, Request $request, $productId)
     {
-        $productId = $request->input('productId');
-        $image = json_decode($request->getContent(), true);
-        Log::info('Add main image:'. json_encode($request->getContent()));
-        $imageIds = $ozonService->addMainImage($productId, $image['externalUrl']);
+        $externalUrl = $request->input('externalUrl');
+        Log::info('Add main image: '. $externalUrl);
+        $imageIds = $ozonService->addMainImage($productId, $externalUrl);
         Log::info('Add main image response:'. json_encode($imageIds));
         return response()->json($imageIds);
     }
