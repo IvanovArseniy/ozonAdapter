@@ -23,6 +23,7 @@ class OzonService
     protected $orderInfoUrl;
     protected $approveOrderUrl;
     protected $cancelOrderUrl;
+    protected $shipOrderUrl;
 
     protected $categoryListUrl;
     protected $categoryAttributeListUrl;
@@ -46,6 +47,7 @@ class OzonService
         $this->orderInfoUrl = config('app.ozon_orderinfo_url');
         $this->approveOrderUrl = config('app.ozon_approveorder_url');
         $this->cancelOrderUrl = config('app.ozon_cancelorder_url');
+        $this->shipOrderUrl = config('app.ozon_shiporder_url');
     
         $this->categoryListUrl = config('app.ozon_categorylist_url');
         $this->categoryAttributeListUrl = config('app.ozon_categoryattributelist_url');
@@ -1532,7 +1534,8 @@ class OzonService
                 'imageUrl' => $item['imageUrl'],
                 'smallThumbnailUrl' => $item['smallThumbnailUrl'],
                 'shipping' => $item['shipping'],
-                'description' => is_null($item['description']) ? '   ' : $item['description']
+                'description' => is_null($item['description']) ? '   ' : $item['description'],
+                'shippingProviderId' => $item['shipping_provider_id']
             ]);
         }
         return $response;
@@ -1560,17 +1563,23 @@ class OzonService
         }
     }
 
-    public function setOrderStatus($orderId, $status)
+    public function setOrderStatus($orderId, $status, $trackingNumber)
     {
         $order = $this->getOrderInfo($orderId);
         if (!is_null($order)) {
-            $items = array();
+            $items = []];
+            $itemsFull = [];
+            $shippingProviderId = null;
             foreach ($order['items'] as $key => $item) {
                 array_push($items, $item['item_id']);
+                array_push($itemsFull, [
+                    'item_id' => $item['item_id'],
+                    'quantity' => $item['quantity']
+                ]);
+                $shippingProviderId = $item['shippingProviderId'];
             }
 
-            Log::info($status);
-            if($status == config('app.order_approve_status'))
+            if(strtoupper($status) == strtoupper(config('app.order_approve_status')))
             {
                 $interactionId = mt_srand();
                 Log::info($interactionId . ' => Approve ozon order:' . strval($order['order_id']));
@@ -1580,7 +1589,7 @@ class OzonService
                 ]);
                 Log::info($interactionId . ' => Approve ozon order result: ' . json_encode($response));
             }
-            if($status == config('app.order_cancel_status'))
+            if(strtoupper($status) == strtoupper(config('app.order_cancel_status')))
             {
                 $interactionId = mt_srand();
                 Log::info($interactionId . ' =>Cancel ozon order:' . strval($order['order_id']));
@@ -1590,6 +1599,17 @@ class OzonService
                     'item_ids' => $items
                 ]);
                 Log::info($interactionId . ' => Cancel ozon order result: ' . json_encode($response));
+            }
+            if (strtoupper($status) == strtoupper(config('app.order_ship_status'))) {
+                $interactionId = mt_srand();
+                Log::info($interactionId . ' =>Ship ozon order:' . strval($order['order_id']));
+                $response = $this->sendData($this->shipOrderUrl, [
+                    'order_id' => $order['order_id'],
+                    "shipping_provider_id": $shippingProviderId,
+                    "tracking_number": $trackingNumber,
+                    'items' => $items
+                ]);
+                Log::info($interactionId . ' => Ship ozon order result: ' . json_encode($response));
             }
 
             return [

@@ -23,7 +23,7 @@ class OrderController extends BaseController
         Log::info('Set order status:'. $orderId);
         Log::info('Set order status:'. json_encode($request->getContent()));
         $statusInfo = json_decode($request->getContent(), true);
-        $result = $ozonService->setOrderStatus($orderId, $statusInfo['fulfillmentStatus']);
+        $result = $ozonService->setOrderStatus($orderId, $statusInfo['fulfillmentStatus'], isset($statusInfo['trackingNumber']) ? $statusInfo['trackingNumber'] : null);
         Log::info('Set order status result:'. json_encode($result));
         return response()->json($result);
     }

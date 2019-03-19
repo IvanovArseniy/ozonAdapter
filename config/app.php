@@ -20,6 +20,7 @@ return [
     'ozon_orderinfo_url' => '/v1/order/{orderId}?translit=true',
     'ozon_approveorder_url' => '/v1/order/items/approve/crossborder',
     'ozon_cancelorder_url' => '/v1/order/items/cancel/crossborder',
+    'ozon_shiplorder_url' => '/v1/order/ship/crossborder',
 
     'ozon_categorylist_url' => '/v1/categories/tree',
     'ozon_categoryattributelist_url' => '/v1/categories/{category_id}/attributes',
@@ -36,6 +37,8 @@ return [
 
     'order_approve_status' => 'PROCESSING',
     'order_cancel_status' => 'WILL_NOT_DELIVER',
+    'order_ship_status' => 'SHIP',
+    'order_delivered_status'=> 'DELIVERED',
     'order_cancel_reason' => 358,
     'order_status' => [
         'AWAITING_APPROVE' => 'AWAITING_PROCESSING',
