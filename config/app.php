@@ -20,7 +20,7 @@ return [
     'ozon_orderinfo_url' => '/v1/order/{orderId}?translit=true',
     'ozon_approveorder_url' => '/v1/order/items/approve/crossborder',
     'ozon_cancelorder_url' => '/v1/order/items/cancel/crossborder',
-    'ozon_shiplorder_url' => '/v1/order/ship/crossborder',
+    'ozon_shiporder_url' => '/v1/order/ship/crossborder',
 
     'ozon_categorylist_url' => '/v1/categories/tree',
     'ozon_categoryattributelist_url' => '/v1/categories/{category_id}/attributes',

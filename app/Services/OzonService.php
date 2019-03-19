@@ -1567,7 +1567,7 @@ class OzonService
     {
         $order = $this->getOrderInfo($orderId);
         if (!is_null($order)) {
-            $items = []];
+            $items = [];
             $itemsFull = [];
             $shippingProviderId = null;
             foreach ($order['items'] as $key => $item) {
@@ -1605,9 +1605,9 @@ class OzonService
                 Log::info($interactionId . ' =>Ship ozon order:' . strval($order['order_id']));
                 $response = $this->sendData($this->shipOrderUrl, [
                     'order_id' => $order['order_id'],
-                    "shipping_provider_id": $shippingProviderId,
-                    "tracking_number": $trackingNumber,
-                    'items' => $items
+                    "shipping_provider_id" =>  $shippingProviderId,
+                    "tracking_number" => $trackingNumber,
+                    'items' => $itemsFull
                 ]);
                 Log::info($interactionId . ' => Ship ozon order result: ' . json_encode($response));
             }

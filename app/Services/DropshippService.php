@@ -65,7 +65,7 @@ class DropshippService
             }
         }
 
-        app('db')->connection('mysql')->table('product_notification')
+        app('db')->connection('mysql')->table('order_notification')
             ->whereIn('id', $successNotifications)
             ->update(['notified' => 1]);        
 
