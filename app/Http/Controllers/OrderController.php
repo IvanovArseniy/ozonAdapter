@@ -18,16 +18,18 @@ class OrderController extends BaseController
         return response()->json($result);
     }
 
-    public function setOrderStatus(OzonService $ozonService, Request $request)
+    public function setOrderStatus(OzonService $ozonService, Request $request, $orderId)
     {
-        Log::info('Set order status:'. $request->input('orderId'));
-        $result = $ozonService->setOrderStatus($request->input('orderId'), $request->getContent());
+        Log::info('Set order status:'. $orderId);
+        Log::info('Set order status:'. json_encode($request->getContent()));
+        $statusInfo = json_decode($request->getContent(), true);
+        $result = $ozonService->setOrderStatus($orderId, $statusInfo['fulfillmentStatus']);
         Log::info('Set order status result:'. json_encode($result));
         return response()->json($result);
     }
 
-    public function getOrderList(OzonService $ozonService, DropshippService $dropshippService)
-    {
+    public function getOrderList( DropshippService $dropshippService)
+    {$ozonService = new OzonService();
         Log::info('Get list of orders');
         $notifyingOrderIds = $ozonService->getOrderList();
         $notifyResult = $dropshippService->notifyOrders($notifyingOrderIds);

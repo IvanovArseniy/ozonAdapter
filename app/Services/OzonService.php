@@ -17,6 +17,7 @@ class OzonService
     protected $activateProductUrl;
     protected $deactivateProductUrl;
     protected $updatePricesUrl;
+    protected $productListUrl;
 
     protected $orderListUrl;
     protected $orderInfoUrl;
@@ -39,6 +40,7 @@ class OzonService
         $this->activateProductUrl = config('app.activate_product_url');
         $this->deactivateProductUrl = config('app.deactivate_product_url');
         $this->updatePricesUrl = config('app.update_productprices_url');
+        $this->productListUrl = config('app.ozon_productlist_url');
     
         $this->orderListUrl = config('app.ozon_orderlist_url');
         $this->orderInfoUrl = config('app.ozon_orderinfo_url');
@@ -559,8 +561,8 @@ class OzonService
     protected function setQuantity($items)
     {
         $interactionId = mt_srand();
-        Log::info($interactionId . ' => Update stocks request to ozon:' . json_encode(['stocks' => $items]));
-        $response = $this->sendData($this->updateStocksUrl, ['stocks' => $items]);
+        Log::info($interactionId . ' => Update stocks request to ozon:' . json_encode($items));
+        $response = $this->sendData($this->updateStocksUrl, $items);
         Log::info($interactionId . ' => Update stocks response: ' . $response);
         $result = json_decode($response, true);
     }
@@ -776,8 +778,8 @@ class OzonService
     protected function setPrices($items)
     {
         $interactionId = mt_srand();
-        Log::info($interactionId . ' => Update prices request to ozon:', json_encode(['prices' => $items]));
-        $response = $this->sendData($this->updatePricesUrl, ['prices' => $items]);
+        Log::info($interactionId . ' => Update prices request to ozon:', json_encode($items));
+        $response = $this->sendData($this->updatePricesUrl, $items);
         Log::info($interactionId . ' => Update prices response: ' . $response);
         $result = json_decode($response, true);
     }
@@ -1082,33 +1084,51 @@ class OzonService
 
 
     ////ScheduledProductUpdate
+    protected function getProductListFromOzon()
+    {
+        $data = [
+            'filter' => ['visibility' => 'ALL']
+        ];
+        $interactionId = mt_srand();
+        Log::info($interactionId . ' => Get products from ozon:', $data);
+        $response = $this->sendData($this->productListUrl, $data);
+        Log::info($interactionId . ' => Ozon products info: ' . $response);
+        $result = json_decode($response, true);
+        return $result;
+    }
+
     public function syncProducts()
     {
         $updatedProducts = array();
         $productResult = app('db')->connection('mysql')->select('select id from product order by update_date asc limit ' . config('app.sync_portion') . '');
         $productResult = array_map('current', json_decode(json_encode($productResult), true));
 
-        $result = app('db')->connection('mysql')->select('
-            select 
-                pv.id as id,
-                pv.product_id as productId,
-                pv.mall_variant_id as mallVariantId,
-                pv.ozon_product_id as ozonProductId,
-                p.name as name,
-                p.description as description,
-                pv.price as price,
-                i.image_url as imageUrl,
-                p.sku as sku
-            from product p
-            inner join product_variant pv on p.id = pv.product_id
-            left join product_variant_image pvi on pv.id = pvi.product_variant_id
-            left join image i on i.id = pvi.image_id
-            where pv.deleted = 0 and i.deleted = 0 and i.is_default = 1 and product_id in (' . implode(',', $productResult) . ')
-        ');
+        if(count($productResult) > 0) {
+            $result = app('db')->connection('mysql')->select('
+                select 
+                    pv.id as id,
+                    pv.product_id as productId,
+                    pv.mall_variant_id as mallVariantId,
+                    pv.ozon_product_id as ozonProductId,
+                    p.name as name,
+                    p.description as description,
+                    pv.price as price,
+                    i.image_url as imageUrl,
+                    p.sku as sku
+                from product p
+                inner join product_variant pv on p.id = pv.product_id
+                left join product_variant_image pvi on pv.id = pvi.product_variant_id
+                left join image i on i.id = pvi.image_id
+                where pv.deleted = 0 and i.deleted = 0 and i.is_default = 1 and product_id in (' . implode(',', $productResult) . ')
+            ');
+        }
+        else {
+            $result = [];
+        }
 
         $notifyingProducts = [];
         $notifyingProductIds = [];
-        if ($result) {
+        if (true) {
             foreach ($result as $key => $productVariant) {
                 if (!in_array($productVariant->productId, $updatedProducts)) {
                     array_push($updatedProducts, $productVariant->productId);
@@ -1188,8 +1208,111 @@ class OzonService
 
             app('db')->connection('mysql')->table('product_notification')
                 ->insert($notifyingProducts);
+
+            $ozonProductList = $this->getProductListFromOzon();
+
+            Log::info('******' . json_encode($ozonProductList));
+            Log::info('******' . json_encode($ozonProductList['result']));
+            Log::info('******' . json_encode($ozonProductList['result']['items']));
+
+            foreach ($ozonProductList['result']['items'] as $key => $ozonProductId) {
+                // if (strval($ozonProductId) != strval(1225867)
+                //     && strval($ozonProductId) != strval(1225868)
+                //     && strval($ozonProductId) != strval(1225870)) {
+                //     continue;
+                // }
+                $productExists = false;
+                foreach ($result as $key => $productVariant) {
+                    if ($ozonProductId['product_id'] == $productVariant->ozonProductId) {
+                        $productExists = true;
+                    }
+                }
+
+                if (!$productExists) {
+                    $response = $this->getProductFromOzon($ozonProductId['product_id']);
+                    $ozonProductInfo = json_decode($response, true);
+
+                    if (isset($ozonProductInfo['result'])) {
+                        $productVariant = app('db')->connection('mysql')->table('product_variant')
+                            ->where('ozon_product_id', $ozonProductInfo['result']['id'])
+                            ->first();
+                        if (!$productVariant) {
+                            $mallItemId = $this->getMallItemId($ozonProductInfo['result']['offer_id']);
+                            if (!is_null($mallItemId)) {
+                                $productId = null;
+                                $product = app('db')->connection('mysql')->table('product')
+                                    ->where('sku', $mallItemId)
+                                    ->first();
+    
+                                if(!$product) {
+                                    $pdo = app('db')->connection('mysql')->getPdo();
+                                    $productResult = app('db')->connection('mysql')->table('product')
+                                        ->insert([
+                                            'name' => $ozonProductInfo['result']['name'],
+                                            'sku' => $mallItemId,
+                                            'enabled' => $ozonProductInfo['result']['visibility_details']['active_product'],
+                                            'update_date' => date('Y-m-d\TH:i:s.u'),
+                                            'unlimited' => !$ozonProductInfo['result']['visibility_details']['has_stock'],
+                                            'quantity' => $ozonProductInfo['result']['stock'],
+                                            'price' => $ozonProductInfo['result']['price'],
+                                            'default_category' => $ozonProductInfo['result']['category_id']
+                                        ]); 
+
+                                    if ($productResult) {
+                                        $productId = $pdo->lastInsertId();
+                                    }
+                                }
+                                else {
+                                    $productId = $product->id;
+                                }
+    
+                                if (!is_null($productId)) {
+                                    $pdo = app('db')->connection('mysql')->getPdo();
+                                    $productVariantResult = app('db')->connection('mysql')->table('product_variant')
+                                        ->insert([
+                                            'product_id' => $productId,
+                                            'mall_variant_id' => $ozonProductInfo['result']['offer_id'],
+                                            'price' => $ozonProductInfo['result']['price'],
+                                            'inventory' => $ozonProductInfo['result']['stock'],
+                                            'ozon_product_id' => $ozonProductInfo['result']['id'],
+                                            'deleted' => 0,
+                                            'sent' => 1
+                                        ]);
+                                    if ($productVariantResult) {
+                                        $productVariantId = $pdo->lastInsertId();
+    
+                                        $mainImage = true;
+                                        foreach ($ozonProductInfo['result']['images'] as $key => $imageUrl) {
+                                            $this->saveImageWithRelation($productVariantId, [
+                                                'imageUrl' => $imageUrl,
+                                                'is_default' => $mainImage
+                                            ]);
+                                            if ($mainImage) {
+                                                $mainImage = false;
+                                            }
+                                        }
+                                    }
+                                }
+    
+                            }
+                        }
+                    }
+                }
+            }
         }
         return $notifyingProductIds;
+    }
+
+    protected function getMallItemId($mallVariantId)
+    {
+        $mallItemId = null;
+        $mallItemResult = app('db')->connection('mysql')->table('mallItem_mallVariant')
+            ->where('mall_variant_id', $mallVariantId)
+            ->first();
+        if ($mallItemResult) {
+            $mallItemId = $mallItemResult->mall_item_id;
+        }
+        return $mallItemId;
     }
 
 
@@ -1199,7 +1322,7 @@ class OzonService
     {
         $to = new DateTime('now');
         $since = new DateTime('now');
-        $since->modify('-1 day');
+        $since->modify('-10 day');
         $data = [
             'since' => $since->format('Y-m-d') . 'T' . $since->format('H:i:s') .'.000Z',
             'to' => $to->format('Y-m-d') . 'T' . $to->format('H:i:s') .'.999Z',
@@ -1264,6 +1387,7 @@ class OzonService
                 }
                 array_push($notifyingOrderIds, $orderId);
                 array_push($notifyingOrders, [
+                    'data' => null,
                     'type' => 'create',
                     'notified' => 0,
                     'order_id' => $orderId
@@ -1279,6 +1403,7 @@ class OzonService
 
                 array_push($notifyingOrderIds, $existedOrder->id);
                 array_push($notifyingOrders, [
+                    'data' => null,
                     'type' => 'delete',
                     'notified' => 0,
                     'order_id' => $existedOrder->id
@@ -1322,6 +1447,7 @@ class OzonService
                         where ozon_product_id = ' . $item['product_id']);
                 $productResponse = $this->getProductFromOzon($item['product_id']);
                 $ozonProduct = json_decode($productResponse, true);
+
                 $productName = '';
                 $productImage = '';
                 if (!is_null($ozonProduct['result'])) {
@@ -1329,9 +1455,21 @@ class OzonService
                     $productImage = $ozonProduct['result']['images'][0];
                 }
 
+                $productId = null;
+                $mallVariantId = null;
+                $description = null;
+                if (count($product) > 0) {
+                    $productId = $product[0]->productId;
+                    $mallVariantId = $product[0]->mallVariantId;
+                    $description = $product[0]->description;
+                }
+                if (is_null($mallVariantId)) {
+                    $mallVariantId = $item['offer_id'];
+                }
+
                 array_push($fullItems, [
-                    'product_id' => $product[0]->productId,
-                    'mallVariantId' => $product[0]->mallVariantId,
+                    'product_id' => $productId,
+                    'mallVariantId' => $mallVariantId,
                     'item_id' => $item['item_id'],
                     'quantity' => $item['quantity'],
                     'offer_id' => $item['offer_id'],
@@ -1344,20 +1482,24 @@ class OzonService
                     'name' => $productName,
                     'imageUrl' => $productImage,
                     'smallThumbnailUrl' => $productImage,
-                    'description' => $product[0]->description
+                    'description' => $description,
+                    'shipping' => 0
                 ]);
             }
 
             $order['result']['items'] = $fullItems;
             return $this->mapOrder($order['result']);
         }
-        return $order;
+        else {
+            return null;
+        }
     }
 
     protected function mapOrder($order)
     {
         $status = $this->mapOrderStatus($order['status']);
         $response = [
+            'order_id' => $order['order_id'],
             'paymentStatus' => 'PAID',
             'fulfillmentStatus' => $status,
             'email' => $order['address']['email'],
@@ -1379,14 +1521,15 @@ class OzonService
 
         foreach ($order['items'] as $key => $item) {
             array_push($response['items'], [
+                'item_id' => $item['item_id'],
                 'mallVariantId' => $item['mallVariantId'],
                 'price' => $item['price'],
                 'quantity' => $item['quantity'],
                 'name' => $item['name'],
                 'imageUrl' => $item['imageUrl'],
                 'smallThumbnailUrl' => $item['smallThumbnailUrl'],
-                //'shipping': {shipping}, // Стоимость доставки рассчитанная для этой позиции
-                'description' => $item['description']
+                'shipping' => $item['shipping'],
+                'description' => is_null($item['description']) ? '   ' : $item['description']
             ]);
         }
         return $response;
@@ -1417,32 +1560,33 @@ class OzonService
     public function setOrderStatus($orderId, $status)
     {
         $order = $this->getOrderInfo($orderId);
-        if (isset($order['result'])) {
+        if (!is_null($order)) {
             $items = array();
-            foreach ($order->result->items as $key => $item) {
-                array_push($items, $item->item_id);
+            foreach ($order['items'] as $key => $item) {
+                array_push($items, $item['item_id']);
             }
 
+            Log::info($status);
             if($status == config('app.order_approve_status'))
             {
                 $interactionId = mt_srand();
-                Log::info($interactionId . ' => Approve ozon order:' . $ozonProductId);
+                Log::info($interactionId . ' => Approve ozon order:' . strval($order['order_id']));
                 $response = $this->sendData($this->approveOrderUrl, [
-                    'order_id' => $order->result->order_id,
+                    'order_id' => $order['order_id'],
                     'item_ids' => $items
                 ]);
-                Log::info($interactionId . ' => Approve ozon order result: ' . $response);
+                Log::info($interactionId . ' => Approve ozon order result: ' . json_encode($response));
             }
             if($status == config('app.order_cancel_status'))
             {
                 $interactionId = mt_srand();
-                Log::info($interactionId . ' =>Cancel ozon order:' . $ozonProductId);
+                Log::info($interactionId . ' =>Cancel ozon order:' . strval($order['order_id']));
                 $response = $this->sendData($this->cancelOrderUrl, [
-                    'order_id' => $order->result->order_id,
+                    'order_id' => $order['order_id'],
                     'reason_code' => config('app.order_cancel_reason'),
                     'item_ids' => $items
                 ]);
-                Log::info($interactionId . ' => Cancel ozon order result: ' . $response);
+                Log::info($interactionId . ' => Cancel ozon order result: ' . json_encode($response));
             }
 
             return [

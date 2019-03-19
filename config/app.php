@@ -13,6 +13,7 @@ return [
     'deactivate_product_url' => '/v1/products/activate',
     'activate_product_url' => '/v1/products/deactivate',
     'update_productprices_url' => '/v1/products/prices',
+    'ozon_productlist_url' => '/v1/product/list',
     'ozon_product_group_attribute' => 8292,
 
     'ozon_orderlist_url' => '/v1/order/list',
@@ -34,7 +35,7 @@ return [
     'dropshipp_updateproduct_url' => '/api/v1/products/1/{product_id}',
 
     'order_approve_status' => 'PROCESSING',
-    'order_cancel_status' => 'RETURNED',
+    'order_cancel_status' => 'WILL_NOT_DELIVER',
     'order_cancel_reason' => 358,
     'order_status' => [
         'AWAITING_APPROVE' => 'AWAITING_PROCESSING',
