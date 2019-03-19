@@ -1605,7 +1605,7 @@ class OzonService
                 Log::info($interactionId . ' =>Ship ozon order:' . strval($order['order_id']));
                 $response = $this->sendData($this->shipOrderUrl, [
                     'order_id' => $order['order_id'],
-                    "shipping_provider_id" =>  $shippingProviderId,
+                    "shipping_provider_id" =>  config('app.russianpost_shipping_provider'),
                     "tracking_number" => $trackingNumber,
                     'items' => $itemsFull
                 ]);

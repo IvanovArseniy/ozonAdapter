@@ -40,6 +40,7 @@ return [
     'order_ship_status' => 'SHIP',
     'order_delivered_status'=> 'DELIVERED',
     'order_cancel_reason' => 358,
+    'russianpost_shipping_provider' => 15406651969000,
     'order_status' => [
         'AWAITING_APPROVE' => 'AWAITING_PROCESSING',
         'AWAITING_PACKAGING' => 'PROCESSING', 
