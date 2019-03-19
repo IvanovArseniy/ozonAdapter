@@ -1445,7 +1445,7 @@ class OzonService
             $fullItems = array();
             foreach ($order['result']['items'] as $key => $item) {
                 $product = app('db')->connection('mysql')
-                    ->select('select pv.product_id as productId, p.description as description, pv.id as mallVariantId from product_variant pv
+                    ->select('select pv.product_id as productId, p.description as description, pv.mall_variant_id as mallVariantId from product_variant pv
                         left join product p on p.id = pv.product_id
                         where ozon_product_id = ' . $item['product_id']);
                 $productResponse = $this->getProductFromOzon($item['product_id']);
