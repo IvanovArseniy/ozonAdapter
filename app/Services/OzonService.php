@@ -357,7 +357,7 @@ class OzonService
 
                 $this->setQuantity([
                     'product_id' => $ozonProduct['result']['id'],
-                    'stock' => $variant->inventory
+                    'stock' => intval($variant->inventory)
                 ]);
             }
             else {
@@ -561,8 +561,8 @@ class OzonService
     protected function setQuantity($items)
     {
         $interactionId = mt_srand();
-        Log::info($interactionId . ' => Update stocks request to ozon:' . json_encode($items));
-        $response = $this->sendData($this->updateStocksUrl, $items);
+        Log::info($interactionId . ' => Update stocks request to ozon:' . json_encode(['stocks' => [$items]]));
+        $response = $this->sendData($this->updateStocksUrl, ['stocks' => [$items]]);
         Log::info($interactionId . ' => Update stocks response: ' . $response);
         $result = json_decode($response, true);
     }
@@ -667,7 +667,7 @@ class OzonService
                     if (!is_null($variant['inventory'])) {
                         $item['quantity'] = $variant['inventory'];
                     }
-                    array_push($result, $this->updateOzonProduct($item, $productId, $variant->mallVariantId));
+                    array_push($result, $this->updateOzonProduct($item, $productId, $variant['mallVariantId']));
                 }
             }
         }
@@ -679,7 +679,7 @@ class OzonService
     protected function updateOzonProduct($product, $productId, $mallVariantId)
     {
         $ozonProductResult = $this->getProductInfo($productId, $mallVariantId);
-        if (!is_null($ozonProductResult['result'])) {
+        if (isset($ozonProductResult['result'])) {
             $interactionId = mt_srand();
             $updateFields = array();
             if (isset($product['color'])) {
@@ -701,8 +701,11 @@ class OzonService
                 $updateNeeded = true;
             }
             if(isset($product['images']) && count($product['images']) > 0) {
-                $request['images'] = $imagesResult['images'];
+                $request['images'] = $product['images'];
                 $updateNeeded = true;
+                foreach ($product['images'] as $key => $image) {
+                    array_push($imagesResult, $image[]);
+                }
             }
 
             $attributes = array();
@@ -738,25 +741,25 @@ class OzonService
 
             if (isset($product['quantity'])) {
                 $quanitiyResult = $this->setQuantity([
-                    'product_id' => $ozonProductResult['result']['Id'],
-                    'stock' => $product['quantity']
+                    'product_id' => $ozonProductResult['result']['id'],
+                    'stock' => intval($product['quantity'])
                 ]);
                 $updateNeeded = true;
             }
 
             if (isset($product['enabled']) && $product['enabled']) {
-                $response = $this->activateProduct($ozonProductResult['result']['Id']);
+                $response = $this->activateProduct($ozonProductResult['result']['id']);
             }
             else if (isset($product['enabled']) && !$product['enabled']){
-                $response = $this->deactivateProduct($ozonProductResult['result']['Id']);
+                $response = $this->deactivateProduct($ozonProductResult['result']['id']);
             }
 
             if (!is_null($product['price'])) {
                 $priceResult = $this->setPrices([
-                    'product_id' => $ozonProductResult['result']['Id'],
-                    'price' => $product['price'],
-                    'old_price' => $ozonProductResult['result']['price'],
-                    'vat' => $ozonProductResult['result']['vat']
+                    'product_id' => $ozonProductResult['result']['id'],
+                    'price' => strval($product['price']),
+                    'old_price' => strval($product['price']),
+                    'vat' => "0"
                 ]);
                 $updateFields['price'] = $product['price'];
                 $updateNeeded = true;
@@ -770,7 +773,7 @@ class OzonService
                     ->update($updateFields);
             }
 
-            return ['productId' => $productId, 'imageIds' => $imagesResult['imageIds']];
+            return ['productId' => $productId];
         }
         else return $ozonProductResult;
     }
@@ -778,8 +781,8 @@ class OzonService
     protected function setPrices($items)
     {
         $interactionId = mt_srand();
-        Log::info($interactionId . ' => Update prices request to ozon:', json_encode($items));
-        $response = $this->sendData($this->updatePricesUrl, $items);
+        Log::info($interactionId . ' => Update prices request to ozon:' . json_encode(['prices' => [$items]]));
+        $response = $this->sendData($this->updatePricesUrl, ['prices' => [$items]]);
         Log::info($interactionId . ' => Update prices response: ' . $response);
         $result = json_decode($response, true);
     }
@@ -874,7 +877,7 @@ class OzonService
                     $variant->id
                 );
                 $result = $this->updateOzonProduct(['images' => $imagesResult['images']],$productId, $variant->mallVariantId);
-                array_push($result, $updateResult['imageIds']);
+                array_push($result, $imagesResult['imageIds']);
             }
         }
         return $result;
@@ -908,7 +911,7 @@ class OzonService
                 $variant[0]->id
             );
             $updateResult = $this->updateOzonProduct(['images' => $imagesResult['images']], $productId, $mallVariantId);
-            array_push($result, $updateResult['imageIds']);
+            array_push($result, $imagesResult['imageIds']);
         }
         return $result;
     }
@@ -952,7 +955,7 @@ class OzonService
                     $variant->id
                 );
                 $updateResult = $this->updateOzonProduct(['images' => $imagesResult['images']], $productId, $variant->mallVariantId);
-                array_push($result, $updateResult['imageIds']);
+                array_push($result, $imagesResult['imageIds']);
             }
         }
 
