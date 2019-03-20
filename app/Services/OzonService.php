@@ -300,31 +300,33 @@ class OzonService
             foreach ($variants as $key => $variant) {
                 if (!is_null($variant->imageUrl)) {
                     $categoryResult = $this->getOzonCategory($variant->defaultCategory, $variant->mallCategoryId, $variant->mallCategoryName);
-                    if (isset($categoryResult['error'])) {
-                        array_push($errorsCategories, $categoryResult['error']);
-                    }
-                    $item = $this->addProductToRequest(
-                        $variant->mallVariantId,
-                        $variant->sku,
-                        $variant->description,
-                        $variant->name,
-                        $variant->price,
-                        $variant->inventory,
-                        $variant->weight,
-                        !$variant->unlimited,
-                        $variant->enabled,
-                        $categoryResult['categoryId'],
-                        $variant->color,
-                        $variant->size,
-                        $variant->imageUrl,
-                        $productId
-                    );
-                    if (!isset($item['success'])) {
-                        array_push($items, $item);
-                        array_push($variantIds, $variant->id);
+                    if (!isset($categoryResult['error'])) {
+                        $item = $this->addProductToRequest(
+                            $variant->mallVariantId,
+                            $variant->sku,
+                            $variant->description,
+                            $variant->name,
+                            $variant->price,
+                            $variant->inventory,
+                            $variant->weight,
+                            !$variant->unlimited,
+                            $variant->enabled,
+                            $categoryResult['categoryId'],
+                            $variant->color,
+                            $variant->size,
+                            $variant->imageUrl,
+                            $productId
+                        );
+                        if (!isset($item['success'])) {
+                            array_push($items, $item);
+                            array_push($variantIds, $variant->id);
+                        }
+                        else {
+                            array_push($errorAttributes, $item['error']);
+                        }
                     }
                     else {
-                        array_push($errorAttributes, $item['error']);
+                        array_push($errorsCategories, $categoryResult['error']);
                     }
                 }
             }
@@ -356,11 +358,6 @@ class OzonService
                 app('db')->connection('mysql')->table('product_variant')
                     ->where('id', $variant->id)
                     ->update(['ozon_product_id' => $ozonProduct['result']['id']]);
-
-                $this->setQuantity([
-                    'product_id' => $ozonProduct['result']['id'],
-                    'stock' => intval($variant->inventory)
-                ]);
             }
             else {
                 array_push($errors, 'Product with id=' . $variant->product_id . ' not created yet in ozon');
@@ -401,46 +398,47 @@ class OzonService
                 }
             }
 
-            if ((is_null($color) || isset($colorAttribute['attributeId'])) && (is_null($size) || isset($sizeAttribute['attributeId']))) {
-                return [
-                    'dropshippProductId' => $productId,
-                    'mallVariantId' => $mallVariantId,
-                    'barcode' => strval($sku),
-                    'description' => $description,
-                    'category_id' => $ozonCategoryId,
-                    'name' => $name,
-                    'offer_id' => $mallVariantId,
-                    'price' => strval($price),
-                    'vat'=> '0',
-                    'weight' => $weight,
-                    'weight_unit' => 'g',
-                    'quantity' => $quantity,
-                    'images' => array([
-                        'file_name' => $mainImageUrl,
-                        'default' => true
-                    ]),
-                    'attributes' => $attributes,
-                    "visibility_details" => [
-                        'has_price' => true,
-                        'has_stock' => $unlimited,
-                        'active_product' => $enabled
-                    ]
-                ];
-            }
-            else {
-                $errorAttributes = array();
-                if (!is_null($color) && !isset($colorAttribute['attributeId'])) {
-                    array_push($errorAttributes, 'Attribute color ' . $color . ' doesn\'t mapped correctly. Attribute map with ID=' . $colorAttribute['attributeMapId'] . ' was created.');
-                }
-                if (!is_null($size) && !isset($sizeAttribute['attributeId'])) {
-                    array_push($errorAttributes, 'Attribute size= ' . $size . ' doesn\'t mapped correctly. Attribute map with ID=' . $sizeAttribute['attributeMapId'] . ' was created.');
-                }
+            return [
+                'dropshippProductId' => $productId,
+                'mallVariantId' => $mallVariantId,
+                'barcode' => strval($sku),
+                'description' => $description,
+                'category_id' => $ozonCategoryId,
+                'name' => $name,
+                'offer_id' => $mallVariantId,
+                'price' => strval($price),
+                'vat'=> '0',
+                'weight' => $weight,
+                'weight_unit' => 'g',
+                'quantity' => $quantity,
+                'images' => array([
+                    'file_name' => $mainImageUrl,
+                    'default' => true
+                ]),
+                'attributes' => $attributes,
+                "visibility_details" => [
+                    'has_price' => true,
+                    'has_stock' => $unlimited,
+                    'active_product' => $enabled
+                ]
+            ];
+            //if ((is_null($color) || isset($colorAttribute['attributeId'])) && (is_null($size) || isset($sizeAttribute['attributeId']))) {
 
-                return [
-                    'success' => false,
-                    'error' => json_encode($errorAttributes)
-                ];
-            }
+            //}
+            // else {
+            //     $errorAttributes = array();
+            //     if (!is_null($color) && !isset($colorAttribute['attributeId'])) {
+            //         array_push($errorAttributes, 'Attribute color ' . $color . ' doesn\'t mapped correctly. Attribute map with ID=' . $colorAttribute['attributeMapId'] . ' was created.');
+            //     }
+            //     if (!is_null($size) && !isset($sizeAttribute['attributeId'])) {
+            //         array_push($errorAttributes, 'Attribute size= ' . $size . ' doesn\'t mapped correctly. Attribute map with ID=' . $sizeAttribute['attributeMapId'] . ' was created.');
+            //     }
+
+            //     return [
+            //         'success' => false,
+            //         'error' => json_encode($errorAttributes)
+            //     ];
+            // }
         }
         else return [
             'success' => false
@@ -501,7 +499,6 @@ class OzonService
         }
         if (is_null($ozonCategoryId)) {
             return [
-                'categoryId' => $defaultCategory,
                 'error' => $error
             ];
         }

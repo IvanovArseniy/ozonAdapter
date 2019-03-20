@@ -40,6 +40,7 @@ $router->group(['prefix' => '1/tech', 'middleware' => 'auth'], function() use ($
     $router->get('/product/create', 'ProductController@scheduleProductCreation');
     $router->get('/product/setIds', 'ProductController@setProductExternalId');
     $router->get('/product/notify', 'ProductController@notifyProducts');
+    $router->get('/product/schedulejobs', 'ProductController@scheduleJobs');
 });
 
 $router->group(['prefix' => '1/orders', 'middleware' => 'auth'], function() use ($router) {
