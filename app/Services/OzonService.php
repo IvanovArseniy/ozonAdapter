@@ -399,8 +399,6 @@ class OzonService
             }
 
             return [
-                'dropshippProductId' => $productId,
-                'mallVariantId' => $mallVariantId,
                 'barcode' => strval($sku),
                 'description' => $description,
                 'category_id' => $ozonCategoryId,
@@ -666,6 +664,9 @@ class OzonService
                     if (!is_null($variant['inventory'])) {
                         $item['quantity'] = $variant['inventory'];
                     }
+                    if (!is_null($product['enabled'])) {
+                        $item['enabled'] = $product['enabled'];
+                    }
                     array_push($result, $this->updateOzonProduct($item, $productId, $variant['mallVariantId']));
                 }
             }
@@ -703,7 +704,7 @@ class OzonService
                 $request['images'] = $product['images'];
                 $updateNeeded = true;
                 foreach ($product['images'] as $key => $image) {
-                    array_push($imagesResult, $image[]);
+                    array_push($imagesResult, $image);
                 }
             }
 
