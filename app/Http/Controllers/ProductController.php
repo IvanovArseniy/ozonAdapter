@@ -33,6 +33,13 @@ class ProductController extends BaseController
         }
     }
 
+    public function scheduleProductsActivation(OzonService $ozonService)
+    {
+        Log::info('Schedule activation');
+        $ozonService->scheduleActivation();
+        Log::info('Send products and get IDs ready!');
+    }
+
     public function scheduleJobs(OzonService $ozonService)
     {
         Log::info('Send products and get IDs.');
@@ -100,19 +107,17 @@ class ProductController extends BaseController
         return response()->json($imageIds);
     }
 
-    public function addGalleryImage(OzonService $ozonService, Request $request)
+    public function addGalleryImage(OzonService $ozonService, Request $request, $productId)
     {
-        $productId = $request->input('productId');
-        $image = json_decode($request->getContent());
-        Log::info('Add gallery image:'. json_encode($request->getContent()));
-        $imageIds = $ozonService->addGalleryImage($productId, $image);
+        $externalUrl = $request->input('externalUrl');
+        Log::info('Add gallery image:'. $externalUrl);
+        $imageIds = $ozonService->addGalleryImage($productId, $externalUrl);
         Log::info('Add gallery image response:'. json_encode($imageIds));
         return response()->json($imageIds);
     }
 
-    public function deleteGalleryImage(OzonService $ozonService, Request $request)
+    public function deleteGalleryImage(OzonService $ozonService, Request $request, $productId)
     {
-        $productId = $request->input('productId');
         $imageId = $request->input('imageId');
         Log::info('Delete gallery image:'. $imageId);
         $result = $ozonService->deleteGalleryImage($imageId, $productId);
@@ -120,13 +125,11 @@ class ProductController extends BaseController
         return response()->json($result);
     }
 
-    public function addGalleryImageForCombination(OzonService $ozonService, Request $request)
+    public function addGalleryImageForCombination(OzonService $ozonService, Request $request, $productId, $combinationId)
     {
-        $productId = $request->input('productId');
-        $mallVariantId = $request->input('combinationId');
-        $image = json_decode($request->getContent());
-        Log::info('Add gallery image for combination:'. json_encode($request->getContent()));
-        $imageIds = $ozonService->addGalleryImageForCombination($productId, $mallVariantId, $image);
+        $externalUrl = $request->input('externalUrl');
+        Log::info('Add gallery image for combination:'. $externalUrl);
+        $imageIds = $ozonService->addGalleryImageForCombination($productId, $combinationId, $externalUrl);
         Log::info('Add gallery image for combunation response:'. json_encode($imageIds));
         return response()->json($imageIds);
     }
