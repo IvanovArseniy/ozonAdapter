@@ -269,6 +269,8 @@ class OzonService
                 left join product_variant_image pvi on pv.id = pvi.product_variant_id
                 left join image i on i.id = pvi.image_id
                     where pv.deleted = 0 and i.deleted = 0 and i.is_default = 1 and pv.ozon_product_id is null and pv.sent = 0
+                order by sent_date asc
+                limit 40
             ');
 
         }
@@ -296,16 +298,20 @@ class OzonService
                     left join product_variant_image pvi on pv.id = pvi.product_variant_id
                     left join image i on i.id = pvi.image_id
                     where pv.deleted = 0 and i.deleted = 0 and i.is_default = 1 and pv.ozon_product_id is null and pv.sent = 0 and pv.product_id = ' . $productId . '
+                    order by sent_date asc
+                    limit 40
             ');
         }
 
         $errorsCategories = [];
         $errorAttributes = [];
         $errorGeneral = [];
+        $setSentDateIds = [];
         if ($variants) {
             $items = [];
             $variantIds = [];
             foreach ($variants as $key => $variant) {
+                array_push($setSentDateIds, $variant->id);
                 if (empty($variant->name) || empty($variant->description)) {
                     array_push($errorGeneral, 'Variant ' . $variant->mallVariantId . '. Name or description is empty');
                     continue;
@@ -351,8 +357,11 @@ class OzonService
             if (isset($result['result']) && isset($result['result']['task_id'])) {
                 app('db')->connection('mysql')->table('product_variant')
                     ->whereIn('id', $variantIds)
-                    ->update(['sent' => 1]);
+                    ->update(['sent' => 1, 'sent_date' => date('Y-m-d\TH:i:s.u')]);
             }
+            app('db')->connection('mysql')->table('product_variant')
+                ->whereIn('id', $setSentDateIds)
+                ->update(['sent_date' => date('Y-m-d\TH:i:s.u')]);
         }
 
         
@@ -536,30 +545,31 @@ class OzonService
                 limit 1
         ');
         if (!$result) {
-            $result = app('db')->connection('mysql')->select('
-                select a.id as attributeId, av.ozon_id as attributeValueId, a.is_collection as isCollection from ozon_category oc
-                    inner join ozon_category_attribute ca on oc.id = ca.ozon_category_id
-                    inner join attribute a on ca.attribute_id = a.id
-                    inner join attribute_value av on a.id = av.attribute_id
-                    where av.value = \'' . $value . '\'
-                        and oc.id = ' . $ozonCategoryId . '
-                    limit 1
-            ');
-            if (!$result)  {
-                $pdo = app('db')->connection('mysql')->getPdo();
-                $result = app('db')->connection('mysql')->table('attribute_value_map')
-                    ->insert([
-                        'value' => $value
-                    ]);
+            // $result = app('db')->connection('mysql')->select('
+            //     select a.id as attributeId, av.ozon_id as attributeValueId, a.is_collection as isCollection from ozon_category oc
+            //         inner join ozon_category_attribute ca on oc.id = ca.ozon_category_id
+            //         inner join attribute a on ca.attribute_id = a.id
+            //         inner join attribute_value av on a.id = av.attribute_id
+            //         where av.value = \'' . $value . '\'
+            //             and oc.id = ' . $ozonCategoryId . '
+            //         limit 1
+            // ');
+            //if (!$result)  {
+                // $pdo = app('db')->connection('mysql')->getPdo();
+                // $result = app('db')->connection('mysql')->table('attribute_value_map')
+                //     ->insert([
+                //         'value' => $value
+                //     ]);
        
-                if ($result)  {
-                    $attributeMapId = $pdo->lastInsertId();
-                }
+                // if ($result)  {
+                //     $attributeMapId = $pdo->lastInsertId();
+                // }
+                $attributeMapId = null;
                 Log::error('Attribute with value ' . $value . ' doesn\'t exists! Attribute map with id=' . $attributeMapId . ' was created.');
                 return [
                     'attributeMapId' => $attributeMapId
                 ];
-            }
+            //}
         }  
         return [
             'attributeId' => $result[0]->attributeId,
@@ -710,9 +720,6 @@ class OzonService
             if(isset($product['images']) && count($product['images']) > 0) {
                 $request['images'] = $product['images'];
                 $updateNeeded = true;
-                foreach ($product['images'] as $key => $image) {
-                    array_push($imagesResult, $image);
-                }
             }
 
             $attributes = array();
@@ -740,7 +747,7 @@ class OzonService
             }
 
             if ($updateNeeded) {
-                Log::info($interactionId . ' => Update product request to ozon:', json_encode($request));
+                Log::info($interactionId . ' => Update product request to ozon:' . json_encode($request));
                 $response = $this->sendData($this->updateProductUrl, $request);
                 Log::info($interactionId . ' => Update product response: ' . $response);
                 $result = json_decode($response, true);
@@ -1128,7 +1135,7 @@ class OzonService
             'filter' => ['visibility' => 'ALL']
         ];
         $interactionId = mt_srand();
-        Log::info($interactionId . ' => Get products from ozon:', $data);
+        Log::info($interactionId . ' => Get products from ozon:' . $data);
         $response = $this->sendData($this->productListUrl, $data);
         Log::info($interactionId . ' => Ozon products info: ' . $response);
         $result = json_decode($response, true);
@@ -1249,10 +1256,6 @@ class OzonService
 
             $ozonProductList = $this->getProductListFromOzon();
 
-            Log::info('******' . json_encode($ozonProductList));
-            Log::info('******' . json_encode($ozonProductList['result']));
-            Log::info('******' . json_encode($ozonProductList['result']['items']));
-
             foreach ($ozonProductList['result']['items'] as $key => $ozonProductId) {
                 // if (strval($ozonProductId) != strval(1225867)
                 //     && strval($ozonProductId) != strval(1225868)
@@ -1370,7 +1373,7 @@ class OzonService
         ];
 
         $interactionId = mt_srand();
-        Log::info($interactionId . ' => Get orders from ozon:', $data);
+        Log::info($interactionId . ' => Get orders from ozon:' . $data);
         $response = $this->sendData($this->orderListUrl, $data);
         Log::info($interactionId . ' => Ozon order info: ' . $response);
         $result = json_decode($response, true);
@@ -1458,19 +1461,16 @@ class OzonService
         $interactionId = mt_srand();
 
         $orderResult = app('db')->connection('mysql')
-            //->table('order')
-            ->select('select id, ozon_order_id, create_date from order where deleted = 0 and (id=' . $orderId . ' OR ozon_order_id=' . $orderId . ')');
-            //->where('deleted', 0)
-            //->where('ozon_order_id', $orderId)
-            //->first();
-        //if (!$orderResult)  {
-        if (!$orderResult || count($orderResult) == 0 || count($orderResult) > 1) {
+            ->table('orders')
+            ->where('deleted', 0)
+            ->where('ozon_order_id', $orderId)
+            ->first();
+        if (!$orderResult)  {
             Log::error('Order with Id ' . $orderId . 'doesn\'t exists!');
             return [
                 'Error' => 'Order with Id ' . $orderId . 'doesn\'t exists!'
             ];
         }
-        $orderResult = $orderResult[0];
 
         Log::info($interactionId . ' => Get order info from ozon: ' . $orderResult->ozon_order_id);
         $response = $this->sendData(str_replace('{orderId}', $orderResult->ozon_order_id, $this->orderInfoUrl), null);
