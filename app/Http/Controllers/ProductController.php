@@ -48,6 +48,12 @@ class ProductController extends BaseController
         Log::info('Send products result:' . json_encode($sendResult));
         Log::info('Get ids result:' . json_encode($idsResult));
         Log::info('Send products and get IDs ready!');
+        Log::info('Send stocks started!');
+        $ozonService->sendStocks(0);
+        $ozonService->sendStocks(40);
+        $ozonService->sendStocks(80);
+        $ozonService->sendStocks(120);
+        Log::info('Send stocks ready!');
         return response()->json([
             'sendResult' => $sendResult,
             'idsResult' => $idsResult,
