@@ -156,52 +156,68 @@ class OzonService
         $productId = 0;
         $result = null;
         
+        if (!isset($product['name']) || is_null($product['name'])) {
+            return [
+                "errorCode" => "NAME_IS_EMPTY",
+                'errorMessage' => 'Name is empty!'
+            ];
+        }
+
+        if (!isset($product['description']) || is_null($product['description'])) {
+            return [
+                "errorCode" => "DESCRIPTION_IS_EMPTY",
+                'errorMessage' => 'Description is empty!'
+            ];
+        }
+
         $categoryResult = $this->getOzonCategory($product['mallCategoryId'], $product['mallCategoryName']);
-        if (!isset($categoryResult['error'])) {
-            try {
-                $pdo = app('db')->connection('mysql')->getPdo();
-                $result = app('db')->connection('mysql')->table('product')
-                    ->insert([
-                        'name' => $product['name'],
-                        'sku' => $product['sku'],
-                        'enabled' => $product['enabled'],
-                        'update_date' => date('Y-m-d\TH:i:s.u'),
-                        'description' => $product['description'],
-                        'unlimited' => $product['unlimited'],
-                        'quantity' => $product['quantity'],
-                        'price' => $product['price'],
-                        'weight' => $product['weight'],
-                        'default_category' => isset($product['categoryIds']) ? $product['categoryIds'][0] : null,
-                        'mall_category_id' => $product['mallCategoryId'],
-                        'mall_category_name' => $product['mallCategoryName']
-                    ]); 
-                if ($result) {
-                    $productId = $pdo->lastInsertId();
-                }
-                else
-                {
-                    Log::error('Insert product to database failed' . $result);
-                    return [
-                        'Error' => 'Failed to insert product to database.'
-                    ];
-                }
-            } catch (\Exception $e) {
-                $result = app('db')->connection('mysql')->table('product')
-                    ->where('sku', $product['sku'])
-                    ->first();
-                if($result) {
-                    $productId = $result->id;
-                }
+        if (isset($categoryResult['error'])) {
+            return [
+                "errorCode" => "CATEGORY_NOT_MAPPED",
+                'errorMessage' => $categoryResult['error']
+            ];
+        }
+
+        try {
+            $pdo = app('db')->connection('mysql')->getPdo();
+            $result = app('db')->connection('mysql')->table('product')
+                ->insert([
+                    'name' => $product['name'],
+                    'sku' => $product['sku'],
+                    'enabled' => $product['enabled'],
+                    'update_date' => date('Y-m-d\TH:i:s.u'),
+                    'description' => $product['description'],
+                    'unlimited' => $product['unlimited'],
+                    'quantity' => $product['quantity'],
+                    'price' => $product['price'],
+                    'weight' => $product['weight'],
+                    'default_category' => isset($product['categoryIds']) ? $product['categoryIds'][0] : null,
+                    'mall_category_id' => $product['mallCategoryId'],
+                    'mall_category_name' => $product['mallCategoryName']
+                ]); 
+            if ($result) {
+                $productId = $pdo->lastInsertId();
             }
-
-
-            $variantIds = $this->createVariants($product['variants'], $productId);
-
-            return ['id' => $productId];
+            else
+            {
+                Log::error('Insert product to database failed' . $result);
+                return [
+                    'Error' => 'Failed to insert product to database.'
+                ];
+            }
+        } catch (\Exception $e) {
+            $result = app('db')->connection('mysql')->table('product')
+                ->where('sku', $product['sku'])
+                ->first();
+            if($result) {
+                $productId = $result->id;
+            }
         }
-        else {
-            return ['error' => $categoryResult['error']];
-        }
+
+
+        $variantIds = $this->createVariants($product['variants'], $productId);
+
+        return ['id' => $productId];
     }
 
     protected function createVariants($variants, $productId)
