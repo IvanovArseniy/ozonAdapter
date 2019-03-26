@@ -44,6 +44,7 @@ class ProductController extends BaseController
     {
         Log::info('Send products and get IDs.');
         $sendResult = $ozonService->scheduleProductCreation();
+        $sendResult = $ozonService->scheduleProductCreation();
         $idsResult = $ozonService->setOzonProductId();
         Log::info('Send products result:' . json_encode($sendResult));
         Log::info('Get ids result:' . json_encode($idsResult));
@@ -95,10 +96,9 @@ class ProductController extends BaseController
         return response()->json($result);
     }
 
-    public function deleteProduct(OzonService $ozonService, Request $request)
+    public function deleteProduct(OzonService $ozonService, Request $request, $productId)
     {
-        $productId = $request->input('productId');
-        Log::info('Delete product:'. json_encode($request->getContent()));
+        Log::info('Delete product:'. strval($productId));
         $result = $ozonService->deleteProduct($productId);
         Log::info('Delete product response:'. json_encode($result));
         return response()->json($result);
