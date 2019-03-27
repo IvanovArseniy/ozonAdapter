@@ -849,7 +849,7 @@ class OzonService
                     $this->enableProduct(boolval($ozonProductResult['result']['visibility_details']['active_product']), $ozonProductResult['result']['id']);
                 }
     
-                if ($updateNeeded) {
+                if ($updateNeeded && count($updateFields) > 0) {
                     app('db')->connection('mysql')->table('product_variant')
                         ->where('deleted', 0)
                         ->where('product_id', $productId)
@@ -861,26 +861,16 @@ class OzonService
             }
             else return $ozonProductResult;
         }
-        else return $ozonProductResult;
+        else return $productVariant;
     }
 
     protected function saveProductVariant($product, $productId, $mallVariantId)
     {
         $updateFields = [];
 
-        if (isset($product['color'])) {
-            $updateFields['color'] = $product['color'];
-        }
-        if (isset($product['size'])) {
-            $updateFields['size'] = $product['size'];
-        }
         if (isset($product['quantity'])) {
             $updateFields['inventory'] = $product['quantity'];
             $updateFields['sent'] = 1;
-        }
-
-        if (isset($product['price'])) {
-            $updateFields['price'] = $product['price'];
         }
 
         if (count($updateFields) > 0) {
@@ -1105,7 +1095,13 @@ class OzonService
 
     protected function compareImages($newImages, $productVariantId)
     {
-        $resultImages = $newImages;
+        $resultImages = [];
+        foreach ($newIamges as $key => $newImage) {
+            array_push($resultImages, [
+                'file_name' => $newImage->imageUrl,
+                'default' => $newImage->is_default
+            ]);
+        }
         $insertedImages = array();
 
         $imageResult = $this->getProductVariantImages($productVariantId);
