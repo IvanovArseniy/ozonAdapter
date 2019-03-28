@@ -1767,7 +1767,7 @@ class OzonService
                         $response = $this->sendData($this->shipOrderUrl, [
                             'order_id' => $order['order_id'],
                             "shipping_provider_id" =>  config('app.russianpost_shipping_provider'),
-                            "tracking_number" => $item['trackingNumber'],
+                            "tracking_number" => $orderItem['trackingNumber'],
                             'items' => [
                                 'item_id' => $itemId,
                                 'quantity' => $quantity
@@ -1776,7 +1776,7 @@ class OzonService
                         Log::info($interactionId . ' => Ship ozon order result: ' . json_encode($response));
                     }
                     else {
-                        Log::error($interactionId . ' => Item not found: ' . json_encode($item['mall_variantId']));
+                        Log::error($interactionId . ' => Item not found: ' . json_encode($orderItem['mallVariantId']));
                     }
                 }
             }
