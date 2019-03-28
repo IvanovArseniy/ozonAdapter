@@ -734,7 +734,26 @@ class OzonService
     public function updateProductLight($product, $productId)
     {
         $result = [];
+
+        $productVariants = $this->getProductVariants($productId);
         if (isset($product['variants']) && count($product['variants']) > 0) {
+            $mallVariantIds = [];
+            foreach ($product['variants'] as $key => $variant) {
+                array_push($mallVariantIds, $variant['mallVariantId']);
+            }
+
+            foreach ($productVariants as $key => $productVariant) {
+                if (!in_array($productVariant->mallVariantId, $mallVariantIds)) {
+                    if ($productVariant->ozonProductId != null) {
+                        $this->deactivateProduct($productVariant->ozonProductId);
+    
+                        app('db')->connection('mysql')->table('product_variant')
+                            ->where('id', $productVariant->id)
+                            ->update(['deleted' => 1]);
+                    }
+                }
+            }
+
             foreach ($product['variants'] as $key => $variant) {
                 $item = [];
                 if (isset($variant['price']) && !is_null($variant['price'])) {
@@ -746,6 +765,9 @@ class OzonService
                 if (isset($product['enabled'])) {
                     $item['enabled'] = $product['enabled'];
                 }
+
+
+
                 array_push($result, $this->updateOzonProduct($item, $productId, $variant['mallVariantId']));
             }
         }
@@ -916,16 +938,13 @@ class OzonService
     public function deleteProduct($productId)
     {
         $result = [];
-        $products = app('db')->connection('mysql')->table('product_variant')
-            ->where('product_id', $productId)
-            ->where('deleted', 0)
-            ->get();
+        $products = $this->getProductVariants($productId);
         foreach ($products as $key => $product) {
-            array_push($result, $this->deactivateProduct($product->ozon_product_id));
+            array_push($result, $this->deactivateProduct($product->ozonProductId));
         }
         app('db')->connection('mysql')->table('product_variant')
             ->where('product_id', $productId)
-            ->update(['deleted' => 1]);        
+            ->update(['deleted' => 1]);
         return $result;
     }
 
@@ -1096,10 +1115,10 @@ class OzonService
     protected function compareImages($newImages, $productVariantId)
     {
         $resultImages = [];
-        foreach ($newIamges as $key => $newImage) {
+        foreach ($newImages as $key => $newImage) {
             array_push($resultImages, [
-                'file_name' => $newImage->imageUrl,
-                'default' => $newImage->is_default
+                'file_name' => $newImage['imageUrl'],
+                'default' => $newImage['is_default']
             ]);
         }
         $insertedImages = array();
@@ -1518,6 +1537,8 @@ class OzonService
                         'deleted' => 0
                     ]);
                 if ($orderResult) {
+                    $this->setOrderStatus($ozonOrder['order_id'], config('app.order_approve_status'), null, null);
+
                     array_push($notifyingOrderIds, $ozonOrder['order_id']);
                     array_push($notifyingOrders, [
                         'data' => null,
@@ -1657,6 +1678,7 @@ class OzonService
         foreach ($order['items'] as $key => $item) {
             array_push($response['items'], [
                 'item_id' => $item['item_id'],
+                'product_id' => $item['product_id'],
                 'mallVariantId' => $item['mallVariantId'],
                 'price' => $item['price'],
                 'quantity' => $item['quantity'],
@@ -1693,7 +1715,7 @@ class OzonService
         }
     }
 
-    public function setOrderStatus($orderId, $status, $trackingNumber)
+    public function setOrderStatus($orderId, $status, $trackingNumber, $orderItems)
     {
         $order = $this->getOrderInfo($orderId);
         if (!is_null($order)) {
@@ -1702,10 +1724,6 @@ class OzonService
             $shippingProviderId = null;
             foreach ($order['items'] as $key => $item) {
                 array_push($items, $item['item_id']);
-                array_push($itemsFull, [
-                    'item_id' => $item['item_id'],
-                    'quantity' => $item['quantity']
-                ]);
                 $shippingProviderId = $item['shippingProviderId'];
             }
 
@@ -1731,15 +1749,35 @@ class OzonService
                 Log::info($interactionId . ' => Cancel ozon order result: ' . json_encode($response));
             }
             if (strtoupper($status) == strtoupper(config('app.order_ship_status'))) {
-                $interactionId = uniqid();
-                Log::info($interactionId . ' =>Ship ozon order:' . strval($order['order_id']));
-                $response = $this->sendData($this->shipOrderUrl, [
-                    'order_id' => $order['order_id'],
-                    "shipping_provider_id" =>  config('app.russianpost_shipping_provider'),
-                    "tracking_number" => $trackingNumber,
-                    'items' => $itemsFull
-                ]);
-                Log::info($interactionId . ' => Ship ozon order result: ' . json_encode($response));
+                foreach ($orderItems as $key => $orderItem) {
+                    $itemId = null;
+                    $quantity = null;
+                    foreach ($order['items'] as $key => $ozonItem) {
+                        if ($orderItem['mallVariantId'] == $ozonItem['mallVariantId']) {
+                            $itemId = $ozonItem['item_id'];
+                            $quantity = $orderItem['quantity'];
+                            break;
+                        }
+                    }
+
+                    $interactionId = uniqid();
+                    if (!is_null($itemId) && !is_null($quantity)) {
+                        Log::info($interactionId . ' =>Ship ozon order:' . strval($order['order_id']));
+                        $response = $this->sendData($this->shipOrderUrl, [
+                            'order_id' => $order['order_id'],
+                            "shipping_provider_id" =>  config('app.russianpost_shipping_provider'),
+                            "tracking_number" => $item['trackingNumber'],
+                            'items' => [
+                                'item_id' => $itemId,
+                                'quantity' => $quantity
+                            ]
+                        ]);
+                        Log::info($interactionId . ' => Ship ozon order result: ' . json_encode($response));
+                    }
+                    else {
+                        Log::error($interactionId . ' => Item not found: ' . json_encode($item['mall_variantId']));
+                    }
+                }
             }
 
             return [

@@ -90,7 +90,7 @@ class ProductController extends BaseController
     {
         $product = json_decode($request->getContent(), true);
         Log::info('Update product:'. strval($productId));
-        Log::info('Update product:'. json_encode($request->getContent()));
+        Log::info('Update product:'. json_encode($product));
         $result = $ozonService->updateProductLight($product, $productId);
         Log::info('Update product response:'. json_encode($result));
         return response()->json($result);

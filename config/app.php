@@ -3,8 +3,11 @@
 return [
     'ozon_api_client_id' => '3639',
     'ozon_api_key' => '4e1938c1-671d-40cd-ab4b-dada9fa16159',
-
     'ozon_base_url' => 'https://api-seller.ozon.ru',
+    // 'ozon_api_client_id' => '466',
+    // 'ozon_api_key' => '9753260e-2324-fde7-97f1-7848ed7ed097',
+    // 'ozon_base_url' => 'http://cb-api.ozonru.me',
+    
     'ozon_productinfo_url' => '/v1/product/info',
     'ozon_importproduct_url' => '/v1/product/import',
     'ozon_createproduct_url' => '/v1/products/create',
@@ -28,7 +31,7 @@ return [
     'dropshipp_key' => 'ak_f4d1b81c00443db21a8fdb569150ba79',
     'dropshipp_owner_token' => 'token_b569150ba79f4d1b81c00443d',
 
-    'dropshipp_base_url' => 'http://dev.dropshipp.io',
+    'dropshipp_base_url' => 'http://dev.dropshipp.io123',
     'dropshipp_token_url' => '?-apikey={api_key}&token={owner_token}',
     //'dropshipp_order_url' => '/api/v1/orders/{owner_id}/{store_num}'
     'dropshipp_order_url' => '/api/v1/orders/1/{store_num}',
