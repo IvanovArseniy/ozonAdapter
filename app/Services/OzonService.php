@@ -1584,7 +1584,8 @@ class OzonService
         if (!$orderResult)  {
             Log::error('Order with Id ' . $orderId . 'doesn\'t exists!');
             return [
-                'Error' => 'Order with Id ' . $orderId . 'doesn\'t exists!'
+                'errorCode' => 'ORDER_NOT_EXISTS',
+                'errorMessage' => 'Order with Id ' . $orderId . 'doesn\'t exists!'
             ];
         }
 
@@ -1718,7 +1719,7 @@ class OzonService
     public function setOrderStatus($orderId, $status, $trackingNumber, $orderItems)
     {
         $order = $this->getOrderInfo($orderId);
-        if (!is_null($order)) {
+        if (!is_null($order) && !isset($order['errorCode'])) {
             $items = [];
             $itemsFull = [];
             $shippingProviderId = null;
