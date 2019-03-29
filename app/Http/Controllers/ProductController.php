@@ -10,22 +10,23 @@ use App\Services\DropshippService;
 
 class ProductController extends BaseController
 {
-    public function getProductInfo(Request $request, $productId)
+    public function getProductInfo(OzonService $ozonService, Request $request, $productId)
     {
-        $ozonService = new OzonService ();
-        Log::info('Get product info:'. json_encode($productId));
+        $interactionId = $ozonService->getInteractionId();
+        Log::info($interactionId . ' => Get product info:'. json_encode($productId));
         $result = $ozonService->getProductFullInfo($productId);
-        Log::info('Get product info response:'. json_encode($result));
+        Log::info($interactionId . ' => Get product info response:'. json_encode($result));
         return response()->json($result);
     }
 
     public function createProduct(OzonService $ozonService, Request $request)
     {
+        $interactionId = $ozonService->getInteractionId();
         $product = json_decode($request->getContent(), true);
-        Log::info('Create product:'. json_encode($request->getContent()));
+        Log::info($interactionId . ' => Create product:'. json_encode($request->getContent()));
         if (!is_null($product) && isset($product['name']) && isset($product['variants']) && count($product['variants']) > 0) {
             $result = $ozonService->createNewProduct($product);
-            Log::info('Create product response:'. json_encode($result));
+            Log::info($interactionId . ' => Create product response:'. json_encode($result));
             return response()->json($result);
         }
         else {
@@ -35,26 +36,28 @@ class ProductController extends BaseController
 
     public function scheduleProductsActivation(OzonService $ozonService)
     {
-        Log::info('Schedule activation');
+        $interactionId = $ozonService->getInteractionId();
+        Log::info($interactionId . ' => Schedule activation');
         $ozonService->scheduleActivation();
-        Log::info('Send products and get IDs ready!');
+        Log::info($interactionId . ' => Send products and get IDs ready!');
     }
 
     public function scheduleJobs(OzonService $ozonService)
     {
-        Log::info('Send products and get IDs.');
+        $interactionId = $ozonService->getInteractionId();
+        Log::info($interactionId . ' => Send products and get IDs.');
         $sendResult = $ozonService->scheduleProductCreation();
         $sendResult = $ozonService->scheduleProductCreation();
         $idsResult = $ozonService->setOzonProductId();
-        Log::info('Send products result:' . json_encode($sendResult));
-        Log::info('Get ids result:' . json_encode($idsResult));
-        Log::info('Send products and get IDs ready!');
-        Log::info('Send stocks started!');
+        Log::info($interactionId . ' => Send products result:' . json_encode($sendResult));
+        Log::info($interactionId . ' => Get ids result:' . json_encode($idsResult));
+        Log::info($interactionId . ' => Send products and get IDs ready!');
+        Log::info($interactionId . ' => Send stocks started!');
         $ozonService->sendStocks(0);
         $ozonService->sendStocks(40);
         $ozonService->sendStocks(80);
         $ozonService->sendStocks(120);
-        Log::info('Send stocks ready!');
+        Log::info($interactionId . ' => Send stocks ready!');
         return response()->json([
             'sendResult' => $sendResult,
             'idsResult' => $idsResult,
@@ -63,80 +66,91 @@ class ProductController extends BaseController
 
     public function scheduleProductCreation(OzonService $ozonService)
     {
-        Log::info('Product creation scheduled. Start');
-        $response = $ozonService->scheduleProductCreation();
-        Log::info('Product creation scheduled. Finish');
+        $interactionId = $ozonService->getInteractionId();
+        Log::info($interactionId . ' => Product creation scheduled. Start');
+        //$response = $ozonService->scheduleProductCreation();
+        ScheduleProductCreationJob::dispatch();
+
+        Log::info($interactionId . ' => Product creation scheduled. Finish');
         return response()->json($response);
     }
 
     public function setProductExternalId(OzonService $ozonService)
     {
-        Log::info('Set product external Ids started');
+        $interactionId = $ozonService->getInteractionId();
+        Log::info($interactionId . ' => Set product external Ids started');
         $response = $ozonService->setOzonProductId();
-        Log::info('Set product external Ids finished');
+        Log::info($interactionId . ' => Set product external Ids finished');
         return response()->json($response);
     }
 
     public function createProductCombination(OzonService $ozonService, Request $request, $productId)
     {
+        $interactionId = $ozonService->getInteractionId();
         $combinations = json_decode($request->getContent(), true);
-        Log::info('Create product combination:'. json_encode($request->getContent()));
+        Log::info($interactionId . ' => Create product combination:'. json_encode($request->getContent()));
         $result = $ozonService->createProductCombination($productId, $combinations);
-        Log::info('Create product combination response:'. json_encode($result));
+        Log::info($interactionId . ' => Create product combination response:'. json_encode($result));
         return response()->json($result);
     }
 
     public function updateProduct(OzonService $ozonService, Request $request, $productId)
     {
+        $interactionId = $ozonService->getInteractionId();
         $product = json_decode($request->getContent(), true);
-        Log::info('Update product:'. strval($productId));
-        Log::info('Update product:'. json_encode($product));
+        Log::info($interactionId . ' => Update product:'. strval($productId));
+        Log::info($interactionId . ' => Update product:'. json_encode($product));
         $result = $ozonService->updateProductLight($product, $productId);
-        Log::info('Update product response:'. json_encode($result));
+        Log::info($interactionId . ' => Update product response:'. json_encode($result));
         return response()->json($result);
     }
 
     public function deleteProduct(OzonService $ozonService, Request $request, $productId)
     {
-        Log::info('Delete product:'. strval($productId));
+        $interactionId = $ozonService->getInteractionId();
+        Log::info($interactionId . ' => Delete product:'. strval($productId));
         $result = $ozonService->deleteProduct($productId);
-        Log::info('Delete product response:'. json_encode($result));
+        Log::info($interactionId . ' => Delete product response:'. json_encode($result));
         return response()->json($result);
     }
 
     public function addMainImage(OzonService $ozonService, Request $request, $productId)
     {
+        $interactionId = $ozonService->getInteractionId();
         $externalUrl = $request->input('externalUrl');
-        Log::info('Add main image: '. $externalUrl);
+        Log::info($interactionId . ' => Add main image: '. $externalUrl);
         $imageIds = $ozonService->addMainImage($productId, $externalUrl);
-        Log::info('Add main image response:'. json_encode($imageIds));
+        Log::info($interactionId . ' => Add main image response:'. json_encode($imageIds));
         return response()->json($imageIds);
     }
 
     public function addGalleryImage(OzonService $ozonService, Request $request, $productId)
     {
+        $interactionId = $ozonService->getInteractionId();
         $externalUrl = $request->input('externalUrl');
-        Log::info('Add gallery image:'. $externalUrl);
+        Log::info($interactionId . ' => Add gallery image:'. $externalUrl);
         $imageIds = $ozonService->addGalleryImage($productId, $externalUrl);
-        Log::info('Add gallery image response:'. json_encode($imageIds));
+        Log::info($interactionId . ' => Add gallery image response:'. json_encode($imageIds));
         return response()->json($imageIds);
     }
 
     public function deleteGalleryImage(OzonService $ozonService, Request $request, $productId)
     {
+        $interactionId = $ozonService->getInteractionId();
         $imageId = $request->input('imageId');
-        Log::info('Delete gallery image:'. $imageId);
+        Log::info($interactionId . ' => Delete gallery image:'. $imageId);
         $result = $ozonService->deleteGalleryImage($imageId, $productId);
-        Log::info('Delete gallery image response:'. json_encode($result));
+        Log::info($interactionId . ' => Delete gallery image response:'. json_encode($result));
         return response()->json($result);
     }
 
     public function addGalleryImageForCombination(OzonService $ozonService, Request $request, $productId, $combinationId)
     {
+        $interactionId = $ozonService->getInteractionId();
         $externalUrl = $request->input('externalUrl');
-        Log::info('Add gallery image for combination:'. $externalUrl);
+        Log::info($interactionId . ' => Add gallery image for combination:'. $externalUrl);
         $imageIds = $ozonService->addGalleryImageForCombination($productId, $combinationId, $externalUrl);
-        Log::info('Add gallery image for combunation response:'. json_encode($imageIds));
+        Log::info($interactionId . ' => Add gallery image for combunation response:'. json_encode($imageIds));
         return response()->json($imageIds);
     }
 
@@ -148,7 +162,7 @@ class ProductController extends BaseController
         return response()->json(['OK']);
     }
 
-    public function notifyProducts(OzonService $ozonService)
+    public function notifyProducts(DropshippService $dropshippService)
     {
         Log::info('Notify product started!');
         $dropshippService->notifyProducts($notifyingProductIds);
