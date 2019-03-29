@@ -1771,10 +1771,10 @@ class OzonService
                             'order_id' => $order['order_id'],
                             "shipping_provider_id" =>  config('app.russianpost_shipping_provider'),
                             "tracking_number" => $orderItem['trackingNumber'],
-                            'items' => [
+                            'items' => [[
                                 'item_id' => $itemId,
                                 'quantity' => $quantity
-                            ]
+                            ]]
                         ]);
                         Log::info($this->interactionId . ' => Ship ozon order result: ' . json_encode($response));
                     }
