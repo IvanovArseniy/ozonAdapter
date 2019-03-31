@@ -1154,9 +1154,12 @@ class OzonService
                 }
 
                 $imageExists = false;
+                $existingImageId = null;
                 foreach ($imageResult as $key => $image) {
                     if($image->imageUrl == $newImage['imageUrl']) {
                         $imageExists = true;
+                        $existingImageId = $image->id;
+                        break;
                     }
                 }
 
@@ -1165,7 +1168,7 @@ class OzonService
                     array_push($insertedImages, $newImageId);
                 }
                 else {
-                    array_push($insertedImages, $image->id);
+                    array_push($insertedImages, $existingImageId);
                 }
             }
 
