@@ -1545,15 +1545,17 @@ class OzonService
                         'deleted' => 0
                     ]);
                 if ($orderResult) {
-                    $this->setOrderStatus($ozonOrder['order_id'], config('app.order_approve_status'), null, null);
+                    $result = $this->setOrderStatus($ozonOrder['order_id'], config('app.order_approve_status'), null, null);
 
-                    array_push($notifyingOrderIds, $ozonOrder['order_id']);
-                    array_push($notifyingOrders, [
-                        'data' => null,
-                        'type' => 'create',
-                        'notified' => 0,
-                        'order_id' => $ozonOrder['order_id']
-                    ]);
+                    if (isset($result['response']) && !is_null($result['response']) && !isset($result['response']['error'])) {
+                        array_push($notifyingOrderIds, $ozonOrder['order_id']);
+                        array_push($notifyingOrders, [
+                            'data' => null,
+                            'type' => 'create',
+                            'notified' => 0,
+                            'order_id' => $ozonOrder['order_id']
+                        ]);
+                    }
                 }
             }
         }
@@ -1734,6 +1736,7 @@ class OzonService
                 $shippingProviderId = $item['shippingProviderId'];
             }
 
+            $response = null;
             if(strtoupper($status) == strtoupper(config('app.order_approve_status')))
             {
                 Log::info($this->interactionId . ' => Approve ozon order:' . strval($order['order_id']));
@@ -1741,6 +1744,7 @@ class OzonService
                     'order_id' => $order['order_id'],
                     'item_ids' => $items
                 ]);
+                $response = json_decode($response, true);
                 Log::info($this->interactionId . ' => Approve ozon order result: ' . json_encode($response));
             }
             if(strtoupper($status) == strtoupper(config('app.order_cancel_status')))
@@ -1751,6 +1755,7 @@ class OzonService
                     'reason_code' => config('app.order_cancel_reason'),
                     'item_ids' => $items
                 ]);
+                $response = json_decode($response, true);
                 Log::info($this->interactionId . ' => Cancel ozon order result: ' . json_encode($response));
             }
             if (strtoupper($status) == strtoupper(config('app.order_ship_status'))) {
@@ -1776,6 +1781,7 @@ class OzonService
                                 'quantity' => $quantity
                             ]]
                         ]);
+                        $response = json_decode($response, true);
                         Log::info($this->interactionId . ' => Ship ozon order result: ' . json_encode($response));
                     }
                     else {
@@ -1784,10 +1790,20 @@ class OzonService
                 }
             }
 
-            return [
-                'order_id' => $orderId,
-                'fulfillmentStatus' => $status
-            ];
+            if (!is_null($response)) {
+                return [
+                    'order_id' => $orderId,
+                    'fulfillmentStatus' => $status,
+                    'response' => $response
+                ];
+            }
+            else {
+                return [
+                    'order_id' => $orderId,
+                    'fulfillmentStatus' => $status,
+                    'response' => 'null'
+                ];
+            }
         }
 
         return $order;
