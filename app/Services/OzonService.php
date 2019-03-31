@@ -445,6 +445,8 @@ class OzonService
         $variants = app('db')->connection('mysql')->table('product_variant')
             ->whereNull('ozon_product_id')
             ->where('sent', 1)
+            ->orderBy('sent_date','desc')
+            ->take(20)
             ->get();
 
         $errors = [];
@@ -1023,23 +1025,23 @@ class OzonService
 
     public function addGalleryImage($productId, $image)
     {
-        $result = [];
+        $imagesResult = [];
         $productVariants = $this->getProductVariants($productId);
         if (!is_null($productVariants)) {
             foreach ($productVariants as $key => $variant) {
                 $imagesResult = $this->compareImages([
                     [
-                        'is_default' => true,
+                        'is_default' => false,
                         'imageUrl' => $image,
                         'deleted' => 0
                     ]],
                     $variant->id
                 );
                 $result = $this->updateOzonProduct(['images' => $imagesResult['images']],$productId, $variant->mallVariantId);
-                array_push($result, $imagesResult['imageIds']);
             }
+            return $imagesResult['imageIds'];
         }
-        return $result;
+        return $imagesResult;
     }
 
     protected function getProductVariants($productId)
@@ -1071,7 +1073,7 @@ class OzonService
         if (!is_null($productVariants) && count($productVariants) > 0) {
             $imagesResult = $this->compareImages([
                 [
-                    'is_default' => true,
+                    'is_default' => false,
                     'imageUrl' => $image,
                     'deleted' => 0
                 ]],
@@ -1161,6 +1163,9 @@ class OzonService
                 if (!$imageExists) {
                     $newImageId = $this->saveImageWithRelation($productVariantId, $newImage);
                     array_push($insertedImages, $newImageId);
+                }
+                else {
+                    array_push($insertedImages, $image->id);
                 }
             }
 

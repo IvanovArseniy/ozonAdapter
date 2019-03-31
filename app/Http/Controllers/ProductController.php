@@ -131,7 +131,12 @@ class ProductController extends BaseController
         Log::info($interactionId . ' => Add gallery image:'. $externalUrl);
         $imageIds = $ozonService->addGalleryImage($productId, $externalUrl);
         Log::info($interactionId . ' => Add gallery image response:'. json_encode($imageIds));
-        return response()->json($imageIds);
+        if (count($imageIds) > 0) {
+            return response()->json(['id' => $imageIds[0]]);
+        }
+        else {
+            return response()->json([]);
+        }
     }
 
     public function deleteGalleryImage(OzonService $ozonService, Request $request, $productId)
