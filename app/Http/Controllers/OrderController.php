@@ -39,7 +39,7 @@ class OrderController extends BaseController
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Get list of orders');
         $notifyingOrderIds = $ozonService->getOrderList();
-        $notifyResult = $dropshippService->notifyOrders($notifyingOrderIds);
+        $notifyResult = $dropshippService->notifyOrders();
         return response()->json($notifyResult);
     }
 }

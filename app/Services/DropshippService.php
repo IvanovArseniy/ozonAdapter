@@ -30,44 +30,43 @@ class DropshippService
         return $url;
     }
 
-    public function notifyOrders($orderIds)
+    public function notifyOrders()
     {
         $notifications = app('db')->connection('mysql')->table('order_notification')
-            ->whereIn('order_id', $orderIds)
             ->where('notified', 0)
+            ->take(20)
             ->get();
-        $successNotifications = [];
         $notificationResult = [];
         foreach ($notifications as $key => $notification) {
+            $success = false;
             if ($notification->type == 'create') {
                 $result = $this->notifyNewOrder($notification->order_id);
                 if (!isset($result['error'])) {
-                    array_push($successNotifications, $notification->id);
                     array_push($notificationResult, $result);
+                    $success = true;
                 }
             }
             if ($notification->type == 'update') {
                 $result = $this->notifyExistedOrder($notification->order_id, $notification->data);
                 if (!isset($result['error'])) {
-                    array_push($successNotifications, $notification->id);
                     array_push($notificationResult, $result);
+                    $success = true;
                 }
             }
             elseif ($notification->type == 'delete') {
                 $result = $this->notifyDeletedOrder($notification->order_id);
                 if (!isset($result['error'])) {
-                    array_push($successNotifications, $notification->id);
                     array_push($notificationResult, $result);
+                    $success = true;
                 }
             }
-            else {
-                array_push($successNotifications, $notification->id);
+
+            if ($success) {
+                app('db')->connection('mysql')->table('order_notification')
+                    ->where('id', $notification->id)
+                    ->update(['notified' => 1]);        
             }
         }
-
-        app('db')->connection('mysql')->table('order_notification')
-            ->whereIn('id', $successNotifications)
-            ->update(['notified' => 1]);        
 
         return $notificationResult;
     }
