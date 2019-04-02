@@ -1,12 +1,12 @@
 <?php
 
 return [
-    // 'ozon_api_client_id' => '3639',
-    // 'ozon_api_key' => '4e1938c1-671d-40cd-ab4b-dada9fa16159',
-    // 'ozon_base_url' => 'https://api-seller.ozon.ru',
-    'ozon_api_client_id' => '466',
-    'ozon_api_key' => '9753260e-2324-fde7-97f1-7848ed7ed097',
-    'ozon_base_url' => 'http://cb-api.ozonru.me',
+    'ozon_api_client_id' => '3639',
+    'ozon_api_key' => '4e1938c1-671d-40cd-ab4b-dada9fa16159',
+    'ozon_base_url' => 'https://api-seller.ozon.ru',
+    // 'ozon_api_client_id' => '466',
+    // 'ozon_api_key' => '9753260e-2324-fde7-97f1-7848ed7ed097',
+    // 'ozon_base_url' => 'http://cb-api.ozonru.me',
     
     'ozon_productinfo_url' => '/v1/product/info',
     'ozon_importproduct_url' => '/v1/product/import',
@@ -55,5 +55,6 @@ return [
         'DELIVERED' => 'READY_FOR_PICKUP'
     ],
 
-    'sync_portion' => 100
+    'sync_portion' => 100,
+    'shipping_rf_code' => 'eecb1edb-d647-479f-aa6e-a2e3c5f16be4'
 ];

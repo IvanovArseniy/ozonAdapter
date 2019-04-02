@@ -184,6 +184,11 @@ class OzonService
             ];
         }
 
+        $checkShippingResult = $this->checkShipping($product);
+        if (!isset($checkShippingResult['success'])) {
+            return $checkShippingResult;
+        }
+
         try {
             $pdo = app('db')->connection('mysql')->getPdo();
             $result = app('db')->connection('mysql')->table('product')
@@ -231,6 +236,15 @@ class OzonService
     {
         $insertedVariants = [];
         foreach ($variants as $key => $variant) {
+            $shippingPrice = 0;
+            foreach ($variant['shippingRaw'] as $key => $shipping) {
+                if (strtolower(strval($shipping['geo_id'])) == strtolower(config('app.shipping_rf_code'))) {
+                    $shippingPrice = floatval($shipping['price']);
+                    break;
+                }
+            }
+            $price = floatval($variant['priceRaw']) + round(($shippingPrice * 1.035), 2);
+
             try {
                 $pdo = app('db')->connection('mysql')->getPdo();
                 $result = app('db')->connection('mysql')->table('product_variant')
@@ -239,7 +253,7 @@ class OzonService
                         'mall_variant_id' => $variant['mallVariantId'],
                         'color' => $variant['color'],
                         'size' => $variant['size'],
-                        'price' => $variant['price'],
+                        'price' => $price,
                         'inventory' => $variant['inventory'],
                         'deleted' => 0,
                         'sent' => 0
@@ -740,6 +754,7 @@ class OzonService
     public function updateProductLight($product, $productId)
     {
         $result = [];
+        $shippingError = false;
 
         $productVariants = $this->getAllProductVariants($productId);
         if (isset($product['variants']) && count($product['variants']) > 0) {
@@ -776,9 +791,40 @@ class OzonService
 
             foreach ($product['variants'] as $key => $variant) {
                 $item = [];
-                if (isset($variant['price']) && !is_null($variant['price'])) {
-                    $item['price'] = $variant['price'];
+
+                if (isset($variant['priceRaw'])) {
+                    $shippingError = false;
+                    if (isset($variant['shippingRaw'])) {
+                        foreach ($variant['shippingRaw'] as $key => $shipping) {
+                            if (isset($shipping['geo_id']) && strtolower(strval($shipping['geo_id'])) == strtolower(config('app.shipping_rf_code'))) {
+                                $shippingError = false;
+                                break;
+                            }
+                            else {
+                                $shippingError = true;
+                            }
+                        }
+                    }
+                    else {
+                        continue;
+                    }
+
+                    if ($shippingError) {
+                        continue;
+                    }
+
+                    $shippingPrice = 0;
+                    foreach ($variant['shippingRaw'] as $key => $shipping) {
+                        if (strtolower(strval($shipping['geo_id'])) == strtolower(config('app.shipping_rf_code'))) {
+                            $shippingPrice = floatval($shipping['price']);
+                            break;
+                        }
+                    }
+                    $price = floatval($variant['priceRaw']) + round(($shippingPrice * 1.035), 2);
+                    $item['price'] = $price;
                 }
+
+
                 if (isset($variant['inventory']) && !is_null($variant['inventory'])) {
                     $item['quantity'] = $variant['inventory'];
                 }
@@ -792,6 +838,36 @@ class OzonService
         
         return $result;
 
+    }
+
+    protected function checkShipping($product)
+    {
+        $shippingError = false;
+        foreach ($product['variants'] as $key => $variant) {
+            if (isset($variant['shippingRaw'])) {
+                foreach ($variant['shippingRaw'] as $key => $shipping) {
+                    if (isset($shipping['geo_id']) && strtolower(strval($shipping['geo_id'])) == strtolower(config('app.shipping_rf_code'))) {
+                        $shippingError = false;
+                        break;
+                    }
+                    else {
+                        $shippingError = true;
+                    }
+                }
+            }
+            else {
+                $shippingError = true;
+            }
+        }
+        if ($shippingError) {
+            return [
+                "errorCode" => "SHIPPING_NOT_FOUND",
+                'errorMessage' => 'Shipping not found.'
+            ];
+        }
+        else {
+            return ['success' => true];
+        }
     }
 
     protected function updateOzonProduct($product, $productId, $mallVariantId)
@@ -1495,12 +1571,13 @@ class OzonService
     {
         $to = new DateTime('now');
         $since = new DateTime('now');
-        $since->modify('-1 day');
+        $since->modify('-3 day');
         $data = [
             'since' => $since->format('Y-m-d') . 'T' . $since->format('H:i:s') .'.000Z',
             'to' => $to->format('Y-m-d') . 'T' . $to->format('H:i:s') .'.999Z',
             //'since' => $since->format('Y-m-d\TH:i:s.u'),
             //'to' => $to->format('Y-m-d\TH:i:s.u'),
+            'status' => 'AWAITING_APPROVE',
             'delivery_schema' => 'crossborder'
         ];
 
@@ -1553,9 +1630,9 @@ class OzonService
                         'deleted' => 0
                     ]);
                 if ($orderResult) {
-                    $result = $this->setOrderStatus($ozonOrder['order_id'], config('app.order_approve_status'), null, null);
+                    $statusResult = $this->setOrderStatus($ozonOrder['order_id'], config('app.order_approve_status'), null, null);
 
-                    if (isset($result['response']) && !is_null($result['response']) && !isset($result['response']['error'])) {
+                    if (isset($statusResult['response']) && !is_null($statusResult['response']) && !isset($statusResult['response']['error'])) {
                         array_push($notifyingOrderIds, $ozonOrder['order_id']);
                         array_push($notifyingOrders, [
                             'data' => null,

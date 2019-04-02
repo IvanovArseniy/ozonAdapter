@@ -23,7 +23,7 @@ class ProductController extends BaseController
     {
         $interactionId = $ozonService->getInteractionId();
         $product = json_decode($request->getContent(), true);
-        Log::info($interactionId . ' => Create product:'. json_encode($request->getContent()));
+        Log::info($interactionId . ' => Create product:'. json_encode($product));
         if (!is_null($product) && isset($product['name']) && isset($product['variants']) && count($product['variants']) > 0) {
             $result = $ozonService->createNewProduct($product);
             Log::info($interactionId . ' => Create product response:'. json_encode($result));
@@ -55,8 +55,6 @@ class ProductController extends BaseController
         Log::info($interactionId . ' => Send stocks started!');
         $ozonService->sendStocks(0);
         $ozonService->sendStocks(40);
-        $ozonService->sendStocks(80);
-        $ozonService->sendStocks(120);
         Log::info($interactionId . ' => Send stocks ready!');
         return response()->json([
             'sendResult' => $sendResult,
