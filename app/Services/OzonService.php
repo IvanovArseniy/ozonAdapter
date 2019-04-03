@@ -1674,11 +1674,11 @@ class OzonService
 
     public function getOrderInfoCommon($orderNr)
     {
-        if (strpos(strval($orderId), '-')  !== false) {
-            return getOrderInfoByNr($orderNr);
+        if (strpos(strval($orderNr), '-')  !== false) {
+            return $this->getOrderInfoByNr($orderNr);
         }
         else {
-            return getOrderInfoById($orderNr);
+            return $this->getOrderInfoById($orderNr);
         }
     }
 
@@ -1780,7 +1780,7 @@ class OzonService
         $status = $this->mapOrderStatus($order['status']);
         $response = [
             'order_id' => $order['order_nr'],
-            'order_ozon_id' => $order['order_id'],
+            'ozon_order_id' => $order['order_id'],
             'paymentStatus' => 'PAID',
             'fulfillmentStatus' => $status,
             'email' => $order['address']['email'],
