@@ -14,7 +14,7 @@ class OrderController extends BaseController
     {
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Get order info:'. $orderNr);
-        $result = $ozonService->getOrderInfoByNr($orderNr);
+        $result = $ozonService->getOrderInfoCommon($orderNr);
         Log::info($interactionId . ' => Get order info result:'. json_encode($result));
         return response()->json($result);
     }

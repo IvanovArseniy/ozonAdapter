@@ -1672,6 +1672,16 @@ class OzonService
         return $notifyingOrderIds;
     }
 
+    public function getOrderInfoCommon($orderNr)
+    {
+        if (strpos(strval($orderId), '-')  !== false) {
+            return getOrderInfoByNr($orderNr);
+        }
+        else {
+            return getOrderInfoById($orderNr);
+        }
+    }
+
     public function getOrderInfoByNr($orderNr)
     {
         $orderResult = app('db')->connection('mysql')
@@ -1832,7 +1842,7 @@ class OzonService
 
     public function setOrderStatus($orderNr, $status, $trackingNumber, $orderItems)
     {
-        $order = $this->getOrderInfoByNr($orderNr);
+        $order = $this->getOrderInfoCommon($orderNr);
         if (!is_null($order) && !isset($order['errorCode'])) {
             $items = [];
             $itemsFull = [];
