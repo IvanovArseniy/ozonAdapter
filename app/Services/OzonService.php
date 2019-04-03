@@ -1750,6 +1750,7 @@ class OzonService
         $status = $this->mapOrderStatus($order['status']);
         $response = [
             'order_id' => $order['order_id'],
+            'order_nr' => $order['order_nr'],
             'paymentStatus' => 'PAID',
             'fulfillmentStatus' => $status,
             'email' => $order['address']['email'],
@@ -1897,16 +1898,18 @@ class OzonService
     public function setOrderNr()
     {
         $orders = app('db')->connection('mysql')->table('orders')
-            ->whereNull('order_nr')
+            ->whereNull('ozon_order_nr')
             ->take(20)
             ->get();
         if ($orders) {
             foreach ($orders as $key => $order) {
                 $orderInfo = $this->getOrderInfo($order->ozon_order_id);
-                if (isset($orderInfo['result'])) {
+                Log::info(json_encode($orderInfo));
+                Log::info(json_encode($orderInfo));
+                if (!is_null($orderInfo) && !isset($orderInfo['errorCode'])) {
                     $orders = app('db')->connection('mysql')->table('orders')
                         ->where('id', $order->id)
-                        ->update(['ozon_order_nr' => $orderInfo['order_id']]);
+                        ->update(['ozon_order_nr' => $orderInfo['order_nr']]);
                 }
             }
         }
