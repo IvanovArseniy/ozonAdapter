@@ -42,4 +42,11 @@ class OrderController extends BaseController
         $notifyResult = $dropshippService->notifyOrders();
         return response()->json($notifyResult);
     }
+    public function setOrderNr(OzonService $ozonService)
+    {
+        $interactionId = $ozonService->getInteractionId();
+        Log::info($interactionId . ' => Set order nr');
+        $result = $ozonService->setOrderNr();
+        return response()->json($result);
+    }
 }
