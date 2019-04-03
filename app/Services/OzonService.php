@@ -1894,6 +1894,23 @@ class OzonService
         return $order;
     }
 
+    public function setOrderNr()
+    {
+        $orders = app('db')->connection('mysql')->table('orders')
+            ->whereNull('order_nr')
+            ->take(20)
+            ->get();
+        if ($orders) {
+            foreach ($orders as $key => $order) {
+                $orderInfo = $this->getOrderInfo($order->ozon_order_id);
+                if (isset($orderInfo['result'])) {
+                    $orders = app('db')->connection('mysql')->table('orders')
+                        ->where('id', $order->id)
+                        ->update(['ozon_order_nr' => $orderInfo['order_id']]);
+                }
+            }
+        }
+    }
 
     //Categories
     public function getCategory($id)
