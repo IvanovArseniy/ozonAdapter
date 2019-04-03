@@ -1577,7 +1577,7 @@ class OzonService
             'to' => $to->format('Y-m-d') . 'T' . $to->format('H:i:s') .'.999Z',
             //'since' => $since->format('Y-m-d\TH:i:s.u'),
             //'to' => $to->format('Y-m-d\TH:i:s.u'),
-            'status' => 'AWAITING_APPROVE',
+            'status' => config('app.ozon_order_status.AWAITING_APPROVE'),
             'delivery_schema' => 'crossborder'
         ];
 
@@ -1604,15 +1604,17 @@ class OzonService
                     if ($ozonOrder['status'] != $existedOrder->status) {
 
                         array_push($notifyingOrderIds, $existedOrder->ozonOrderId);
-                        array_push($notifyingOrders, [
-                            'type' => 'update',
-                            'notified' => 0,
-                            'data' => json_encode([
-                                'oldFulfillmentStatus' => $this->mapOrderStatus($existedOrder->status),
-                                'newFulfillmentStatus' => $this->mapOrderStatus($ozonOrder['status'])
-                            ]),
-                            'order_id' => $ozonOrder['order_id']
-                        ]);
+                        if ($ozonOrder['status'] != config('app.ozon_order_status.AWAITING_PACKAGING')) {
+                            array_push($notifyingOrders, [
+                                'type' => 'update',
+                                'notified' => 0,
+                                'data' => json_encode([
+                                    'oldFulfillmentStatus' => $this->mapOrderStatus($existedOrder->status),
+                                    'newFulfillmentStatus' => $this->mapOrderStatus($ozonOrder['status'])
+                                ]),
+                                'order_id' => $ozonOrder['order_id']
+                            ]);
+                        }
 
                         app('db')->connection('mysql')->table('orders')
                             ->where('id', $existedOrder->id)
@@ -1622,12 +1624,15 @@ class OzonService
             }
 
             if (!$orderExists) {
+                $orderInfo = $this->getOrderInfoById($ozonOrder['order_id']);
+
                 $orderResult = app('db')->connection('mysql')->table('orders')
                     ->insert([
                         'ozon_order_id' => $ozonOrder['order_id'],
                         'create_date' => date('Y-m-d\TH:i:s.u'),
                         'status' => $ozonOrder['status'],
-                        'deleted' => 0
+                        'deleted' => 0,
+                        'order_nr' => $orderInfo['order_nr']
                     ]);
                 if ($orderResult) {
                     $statusResult = $this->setOrderStatus($ozonOrder['order_id'], config('app.order_approve_status'), null, null);
@@ -1667,18 +1672,33 @@ class OzonService
         return $notifyingOrderIds;
     }
 
-    public function getOrderInfo($orderId)
+    public function getOrderInfoByNr($orderNr)
+    {
+        $orderResult = app('db')->connection('mysql')
+            ->table('orders')
+            ->where('deleted', 0)
+            ->where('ozon_order_nr', $orderNr)
+            ->first();
+        return $this->getOrderInfo($orderResult);
+    }
+
+    public function getOrderInfoById($orderId)
     {
         $orderResult = app('db')->connection('mysql')
             ->table('orders')
             ->where('deleted', 0)
             ->where('ozon_order_id', $orderId)
             ->first();
+        return $this->getOrderInfo($orderResult);
+    }
+
+    protected function getOrderInfo($orderResult)
+    {
         if (!$orderResult)  {
-            Log::error('Order with Id ' . $orderId . 'doesn\'t exists!');
+            Log::error('Order with Id ' . $orderNr . 'doesn\'t exists!');
             return [
                 'errorCode' => 'ORDER_NOT_EXISTS',
-                'errorMessage' => 'Order with Id ' . $orderId . 'doesn\'t exists!'
+                'errorMessage' => 'Order with Id ' . $orderNr . 'doesn\'t exists!'
             ];
         }
 
@@ -1749,7 +1769,8 @@ class OzonService
     {
         $status = $this->mapOrderStatus($order['status']);
         $response = [
-            'order_id' => $order['order_id'],
+            'order_id' => $order['order_nr'],
+            'order_ozon_id' => $order['order_id'],
             'paymentStatus' => 'PAID',
             'fulfillmentStatus' => $status,
             'email' => $order['address']['email'],
@@ -1809,9 +1830,9 @@ class OzonService
         }
     }
 
-    public function setOrderStatus($orderId, $status, $trackingNumber, $orderItems)
+    public function setOrderStatus($orderNr, $status, $trackingNumber, $orderItems)
     {
-        $order = $this->getOrderInfo($orderId);
+        $order = $this->getOrderInfoByNr($orderNr);
         if (!is_null($order) && !isset($order['errorCode'])) {
             $items = [];
             $itemsFull = [];
@@ -1877,14 +1898,14 @@ class OzonService
 
             if (!is_null($response)) {
                 return [
-                    'order_id' => $orderId,
+                    'order_id' => $orderNr,
                     'fulfillmentStatus' => $status,
                     'response' => $response
                 ];
             }
             else {
                 return [
-                    'order_id' => $orderId,
+                    'order_id' => $orderNr,
                     'fulfillmentStatus' => $status,
                     'response' => 'null'
                 ];
@@ -1911,6 +1932,7 @@ class OzonService
             }
         }
     }
+
 
     //Categories
     public function getCategory($id)

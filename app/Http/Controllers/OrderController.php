@@ -10,23 +10,23 @@ use App\Services\DropshippService;
 
 class OrderController extends BaseController
 {
-    public function getOrderInfo(OzonService $ozonService, Request $request, $orderId)
+    public function getOrderInfo(OzonService $ozonService, Request $request, $orderNr)
     {
         $interactionId = $ozonService->getInteractionId();
-        Log::info($interactionId . ' => Get order info:'. $orderId);
-        $result = $ozonService->getOrderInfo($orderId);
+        Log::info($interactionId . ' => Get order info:'. $orderNr);
+        $result = $ozonService->getOrderInfoByNr($orderNr);
         Log::info($interactionId . ' => Get order info result:'. json_encode($result));
         return response()->json($result);
     }
 
-    public function setOrderStatus(OzonService $ozonService, Request $request, $orderId)
+    public function setOrderStatus(OzonService $ozonService, Request $request, $orderNr)
     {
         $interactionId = $ozonService->getInteractionId();
-        Log::info($interactionId . ' => Set order status:'. $orderId);
+        Log::info($interactionId . ' => Set order status:'. $orderNr);
         Log::info($interactionId . ' => Set order status:'. json_encode($request->getContent()));
         $statusInfo = json_decode($request->getContent(), true);
         $result = $ozonService->setOrderStatus(
-            $orderId,
+            $orderNr,
             $statusInfo['fulfillmentStatus'],
             isset($statusInfo['trackingNumber']) ? $statusInfo['trackingNumber'] : null,
             isset($statusInfo['items']) ? $statusInfo['items'] : null);
@@ -42,6 +42,7 @@ class OrderController extends BaseController
         $notifyResult = $dropshippService->notifyOrders();
         return response()->json($notifyResult);
     }
+
     public function setOrderNr(OzonService $ozonService)
     {
         $interactionId = $ozonService->getInteractionId();
