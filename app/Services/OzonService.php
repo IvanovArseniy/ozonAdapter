@@ -243,7 +243,7 @@ class OzonService
                     break;
                 }
             }
-            $price = floatval($variant['priceRaw']) + round(($shippingPrice * 1.035), 2);
+            $price = round((floatval($variant['priceRaw']) / 1.0815 * 1.035) + ($shippingPrice * 1.035), 2);
 
             try {
                 $pdo = app('db')->connection('mysql')->getPdo();
@@ -820,7 +820,7 @@ class OzonService
                             break;
                         }
                     }
-                    $price = floatval($variant['priceRaw']) + round(($shippingPrice * 1.035), 2);
+                    $price = round((floatval($variant['priceRaw']) / 1.0815 * 1.035) + ($shippingPrice * 1.035), 2);
                     $item['price'] = $price;
                 }
 
