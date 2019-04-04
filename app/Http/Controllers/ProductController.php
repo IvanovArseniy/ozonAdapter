@@ -54,7 +54,6 @@ class ProductController extends BaseController
         Log::info($interactionId . ' => Send products and get IDs ready!');
         Log::info($interactionId . ' => Send stocks started!');
         $ozonService->sendStocks(0);
-        $ozonService->sendStocks(40);
         Log::info($interactionId . ' => Send stocks ready!');
         return response()->json([
             'sendResult' => $sendResult,
