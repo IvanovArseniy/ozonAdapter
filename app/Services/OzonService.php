@@ -1592,7 +1592,7 @@ class OzonService
         $existedOrders = [];
         if (count($result['result']['order_ids']) > 0) {
             $existedOrders = app('db')->connection('mysql')
-                ->select('select id, ozon_order_id as ozonOrderId, status from orders where ozon_order_id IN (' . implode(',', $result['result']['order_ids']) . ')');
+                ->select('select id, ozon_order_id as ozonOrderId, ozon_order_nr as ozonOrderNr, status from orders where ozon_order_id IN (' . implode(',', $result['result']['order_ids']) . ')');
         }
 
         foreach ($ozonOrders as $key => $ozonOrder) {
@@ -1603,7 +1603,7 @@ class OzonService
                     $orderExists = true;
                     if ($ozonOrder['status'] != $existedOrder->status) {
 
-                        array_push($notifyingOrderIds, $existedOrder->ozonOrderId);
+                        array_push($notifyingOrderIds, $existedOrder->ozonOrderNr);
                         if ($ozonOrder['status'] != config('app.ozon_order_status.AWAITING_PACKAGING')) {
                             array_push($notifyingOrders, [
                                 'type' => 'update',
@@ -1612,7 +1612,7 @@ class OzonService
                                     'oldFulfillmentStatus' => $this->mapOrderStatus($existedOrder->status),
                                     'newFulfillmentStatus' => $this->mapOrderStatus($ozonOrder['status'])
                                 ]),
-                                'order_id' => $ozonOrder['order_id']
+                                'order_id' => $existedOrder->ozonOrderId
                             ]);
                         }
 
@@ -1624,26 +1624,26 @@ class OzonService
             }
 
             if (!$orderExists) {
-                $orderInfo = $this->getOrderInfoById($ozonOrder['order_id']);
+                $orderInfo = $this->getOzonOrderInfo($ozonOrder['order_id']);
 
                 $orderResult = app('db')->connection('mysql')->table('orders')
                     ->insert([
-                        'ozon_order_id' => $ozonOrder['order_id'],
+                        'ozon_order_id' => $orderInfo['ozon_order_id'],
                         'create_date' => date('Y-m-d\TH:i:s.u'),
                         'status' => $ozonOrder['status'],
                         'deleted' => 0,
-                        'order_nr' => $orderInfo['order_nr']
+                        'ozon_order_nr' => $orderInfo['order_id']
                     ]);
                 if ($orderResult) {
                     $statusResult = $this->setOrderStatus($ozonOrder['order_id'], config('app.order_approve_status'), null, null);
 
                     if (isset($statusResult['response']) && !is_null($statusResult['response']) && !isset($statusResult['response']['error'])) {
-                        array_push($notifyingOrderIds, $ozonOrder['order_id']);
+                        array_push($notifyingOrderIds, $orderInfo['order_id']);
                         array_push($notifyingOrders, [
                             'data' => null,
                             'type' => 'create',
                             'notified' => 0,
-                            'order_id' => $ozonOrder['order_id']
+                            'order_id' => $orderInfo['ozon_order_id']
                         ]);
                     }
                 }
@@ -1656,7 +1656,7 @@ class OzonService
                     ->where('id', $existedOrder->id)
                     ->update(['deleted' => 1]);
 
-                array_push($notifyingOrderIds, $existedOrder->ozonOrderId);
+                array_push($notifyingOrderIds, $existedOrder->ozonOrderNr);
                 array_push($notifyingOrders, [
                     'data' => null,
                     'type' => 'delete',
@@ -1705,20 +1705,25 @@ class OzonService
     protected function getOrderInfo($orderResult)
     {
         if (!$orderResult)  {
-            Log::error('Order with Id ' . $orderNr . 'doesn\'t exists!');
+            Log::error('Order doesn\'t exists!');
             return [
                 'errorCode' => 'ORDER_NOT_EXISTS',
-                'errorMessage' => 'Order with Id ' . $orderNr . 'doesn\'t exists!'
+                'errorMessage' => 'Order with Id doesn\'t exists!'
             ];
         }
+        $order =  $this->getOzonOrderInfo($orderResult->ozon_order_id);
+        $order['createDate'] = $orderResult->create_date;
+        return $order;
+    }
 
-        Log::info($this->interactionId . ' => Get order info from ozon: ' . $orderResult->ozon_order_id);
-        $response = $this->sendData(str_replace('{orderId}', $orderResult->ozon_order_id, $this->orderInfoUrl), null);
+    protected function getOzonOrderInfo($ozonOrderId)
+    {
+        Log::info($this->interactionId . ' => Get order info from ozon: ' . $ozonOrderId);
+        $response = $this->sendData(str_replace('{orderId}', $ozonOrderId, $this->orderInfoUrl), null);
         Log::info($this->interactionId . ' => Ozon order info: ' . $response);
         $order = json_decode($response, true);
 
         if (isset($order['result'])) {
-            $order['result']['createDate'] = $orderResult->create_date;
             $fullItems = array();
             foreach ($order['result']['items'] as $key => $item) {
                 $product = app('db')->connection('mysql')
@@ -1785,7 +1790,6 @@ class OzonService
             'fulfillmentStatus' => $status,
             'email' => $order['address']['email'],
             //'ipAddress': {ipAddress}, ??
-            'createDate' => $order['createDate'],
             'refererUrl' => 'http://ozon.ru/',
             'shippingPerson' => [
                 'name' => $order['address']['addressee'],
@@ -1855,9 +1859,9 @@ class OzonService
             $response = null;
             if(strtoupper($status) == strtoupper(config('app.order_approve_status')))
             {
-                Log::info($this->interactionId . ' => Approve ozon order:' . strval($order['order_id']));
+                Log::info($this->interactionId . ' => Approve ozon order:' . strval($order['ozon_order_id']));
                 $response = $this->sendData($this->approveOrderUrl, [
-                    'order_id' => $order['order_id'],
+                    'order_id' => $order['ozon_order_id'],
                     'item_ids' => $items
                 ]);
                 $response = json_decode($response, true);
@@ -1865,9 +1869,9 @@ class OzonService
             }
             if(strtoupper($status) == strtoupper(config('app.order_cancel_status')))
             {
-                Log::info($this->interactionId . ' =>Cancel ozon order:' . strval($order['order_id']));
+                Log::info($this->interactionId . ' =>Cancel ozon order:' . strval($order['ozon_order_id']));
                 $response = $this->sendData($this->cancelOrderUrl, [
-                    'order_id' => $order['order_id'],
+                    'order_id' => $order['ozon_order_id'],
                     'reason_code' => config('app.order_cancel_reason'),
                     'item_ids' => $items
                 ]);
@@ -1887,9 +1891,9 @@ class OzonService
                     }
 
                     if (!is_null($itemId) && !is_null($quantity)) {
-                        Log::info($this->interactionId . ' =>Ship ozon order:' . strval($order['order_id']));
+                        Log::info($this->interactionId . ' =>Ship ozon order:' . strval($order['ozon_order_id']));
                         $response = $this->sendData($this->shipOrderUrl, [
-                            'order_id' => $order['order_id'],
+                            'order_id' => $order['ozon_order_id'],
                             "shipping_provider_id" =>  config('app.russianpost_shipping_provider'),
                             "tracking_number" => $orderItem['trackingNumber'],
                             'items' => [[
