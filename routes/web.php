@@ -41,6 +41,7 @@ $router->group(['prefix' => '1/tech', 'middleware' => 'auth'], function() use ($
     $router->get('/product/setIds', 'ProductController@setProductExternalId');
     $router->get('/product/notify', 'ProductController@notifyProducts');
     $router->get('/product/schedulejobs', 'ProductController@scheduleJobs');
+    $router->get('/product/setstock', 'ProductController@setStock');
     $router->get('/order/setOrderNr', 'OrderController@setOrderNr');
 });
 

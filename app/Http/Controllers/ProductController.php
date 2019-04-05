@@ -52,9 +52,7 @@ class ProductController extends BaseController
         Log::info($interactionId . ' => Send products result:' . json_encode($sendResult));
         Log::info($interactionId . ' => Get ids result:' . json_encode($idsResult));
         Log::info($interactionId . ' => Send products and get IDs ready!');
-        Log::info($interactionId . ' => Send stocks started!');
-        $ozonService->sendStocks(0);
-        Log::info($interactionId . ' => Send stocks ready!');
+
         return response()->json([
             'sendResult' => $sendResult,
             'idsResult' => $idsResult,
@@ -79,6 +77,16 @@ class ProductController extends BaseController
         $response = $ozonService->setOzonProductId();
         Log::info($interactionId . ' => Set product external Ids finished');
         return response()->json($response);
+    }
+
+    public function setStock(OzonService $ozonService)
+    {
+        $interactionId = $ozonService->getInteractionId();
+        Log::info($interactionId . ' => Send stocks started!');
+        $result = $ozonService->sendStocks(0);
+        $result = $ozonService->sendStocks(0);
+        Log::info($interactionId . ' => Send stocks ready!');
+        return response()->json($result);
     }
 
     public function createProductCombination(OzonService $ozonService, Request $request, $productId)
