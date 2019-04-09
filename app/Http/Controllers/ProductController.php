@@ -44,6 +44,11 @@ class ProductController extends BaseController
 
     public function scheduleJobs(OzonService $ozonService)
     {
+        if (file_exists('scheduleJobs.lock')) {
+            return response()->json(['error' => 'scheduleJobs job already in work']);
+        }
+        file_put_contents('scheduleJobs.lock', 'Start');
+
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Send products and get IDs.');
         $sendResult = $ozonService->scheduleProductCreation();
@@ -52,6 +57,8 @@ class ProductController extends BaseController
         Log::info($interactionId . ' => Send products result:' . json_encode($sendResult));
         Log::info($interactionId . ' => Get ids result:' . json_encode($idsResult));
         Log::info($interactionId . ' => Send products and get IDs ready!');
+
+        unlink('scheduleJobs.lock');
 
         return response()->json([
             'sendResult' => $sendResult,
@@ -72,20 +79,36 @@ class ProductController extends BaseController
 
     public function setProductExternalId(OzonService $ozonService)
     {
+        if (file_exists('setProductExternalId.lock')) {
+            return response()->json(['error' => 'setProductExternalId job already in work']);
+        }
+        file_put_contents('setProductExternalId.lock', 'Start');
+
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Set product external Ids started');
         $response = $ozonService->setOzonProductId();
         Log::info($interactionId . ' => Set product external Ids finished');
+
+        unlink('setProductExternalId.lock');
+
         return response()->json($response);
     }
 
     public function setStock(OzonService $ozonService)
     {
+        if (file_exists('setStock.lock')) {
+            return response()->json(['error' => 'setStock job already in work']);
+        }
+        file_put_contents('setStock.lock', 'Start');
+
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Send stocks started!');
         $result = $ozonService->sendStocks(0);
         $result = $ozonService->sendStocks(0);
         Log::info($interactionId . ' => Send stocks ready!');
+
+        unlink('setStock.lock');
+
         return response()->json($result);
     }
 
