@@ -44,10 +44,10 @@ class ProductController extends BaseController
 
     public function scheduleJobs(OzonService $ozonService)
     {
-        if (file_exists('scheduleJobs.lock')) {
+        if (file_exists(storage_path() . '/app/scheduleJobs.lock')) {
             return response()->json(['error' => 'scheduleJobs job already in work']);
         }
-        file_put_contents('scheduleJobs.lock', 'Start');
+        file_put_contents(storage_path() . '/app/scheduleJobs.lock', 'Start');
 
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Send products and get IDs.');
@@ -58,7 +58,7 @@ class ProductController extends BaseController
         Log::info($interactionId . ' => Get ids result:' . json_encode($idsResult));
         Log::info($interactionId . ' => Send products and get IDs ready!');
 
-        unlink('scheduleJobs.lock');
+        unlink(storage_path() . '/app/scheduleJobs.lock');
 
         return response()->json([
             'sendResult' => $sendResult,
@@ -79,27 +79,27 @@ class ProductController extends BaseController
 
     public function setProductExternalId(OzonService $ozonService)
     {
-        if (file_exists('setProductExternalId.lock')) {
+        if (file_exists(storage_path() . '/app/setProductExternalId.lock')) {
             return response()->json(['error' => 'setProductExternalId job already in work']);
         }
-        file_put_contents('setProductExternalId.lock', 'Start');
+        file_put_contents(storage_path() . '/app/setProductExternalId.lock', 'Start');
 
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Set product external Ids started');
         $response = $ozonService->setOzonProductId();
         Log::info($interactionId . ' => Set product external Ids finished');
 
-        unlink('setProductExternalId.lock');
+        unlink(storage_path() . '/app/setProductExternalId.lock');
 
         return response()->json($response);
     }
 
     public function setStock(OzonService $ozonService)
     {
-        if (file_exists('setStock.lock')) {
+        if (file_exists(storage_path() . '/app/setStock.lock')) {
             return response()->json(['error' => 'setStock job already in work']);
         }
-        file_put_contents('setStock.lock', 'Start');
+        file_put_contents(storage_path() . '/app/setStock.lock', 'Start');
 
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Send stocks started!');
@@ -107,7 +107,7 @@ class ProductController extends BaseController
         $result = $ozonService->sendStocks(0);
         Log::info($interactionId . ' => Send stocks ready!');
 
-        unlink('setStock.lock');
+        unlink(storage_path() . '/app/setStock.lock');
 
         return response()->json($result);
     }
