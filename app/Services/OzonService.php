@@ -834,6 +834,13 @@ class OzonService
 
                 array_push($result, $this->updateOzonProduct($item, $productId, $variant['mallVariantId']));
             }
+        }elseif(isset($product['enabled'])) {
+            foreach ($productVariants as $key => $productVariant) {
+                $item = [
+                    'enabled' => $product['enabled']
+                ];
+                array_push($result, $this->updateOzonProduct($item, $productId, $productVariant->mallVariantId));
+            }
         }
         
         return $result;
