@@ -82,9 +82,7 @@ class OzonService
         if(count($products) > 0)
         {
             foreach ($products as $key => $product) {
-                $response = $this->getProductFromOzon($product->ozonProductId);
-
-                $response = json_decode($response, true);
+                $response = $this->getProductInfo($product->ozonProductId);
                 if (isset($response['result'])) {
                     $name = $response['result']['name'];
                     $imageResult = $this->getImages($response['result']['images'], $product->id);
@@ -138,11 +136,28 @@ class OzonService
         if (isset($result['result'])) {
             return $result;
         }
-        else return $result;
+        else {
+            $variant = app('db')->connection('mysql')->table('product_variant')
+                ->where('ozon_product_id', $ozonProductId)
+                ->first();
+            if($variant) {
+                $byofferResponse = $this->getProductFromOzonByOfferId($variant->mall_variant_id);
+                $byofferResult = json_decode($byofferResponse, true);
+                if (isset($byofferResult['result'])) {
+                    app('db')->connection('mysql')->table('product_variant')
+                        ->where('id', $variant->id)
+                        ->update(['ozon_product_id' => $byofferResult['result']['id']]);
+                    return $byofferResult;
+                }
+                else return $byofferResult;
+            }
+            else return $result;
+        }
     }
 
     protected function getProductFromOzon($ozonProductId)
     {
+
         Log::info($this->interactionId . ' => Get product info from ozon:' . json_encode(['product_id' => $ozonProductId]));
         $response = $this->sendData($this->productInfoUrl, ['product_id' => $ozonProductId]);
         Log::info($this->interactionId . ' => Ozon products: ' . $response);
@@ -418,8 +433,7 @@ class OzonService
         $variantIds = [];
         foreach ($variants as $key => $variant) {
             array_push($variantIds, $variant->id);
-            $response = $this->getProductFromOzon($variant->ozon_product_id);
-            $ozonProductResult = json_decode($response, true);
+            $ozonProductResult = $this->getProductInfo($variant->ozon_product_id);
             if (isset($ozonProductResult['result']) ?? strtolower($ozonProductResult['state']) == strtolower('processed')) {
                 $inventory = intval($variant->inventory) - 5;
                 $inventory = $inventory > 0 ? $inventory : 0;
@@ -1489,8 +1503,7 @@ class OzonService
                 }
 
                 if (!$productExists) {
-                    $response = $this->getProductFromOzon($ozonProductId['product_id']);
-                    $ozonProductInfo = json_decode($response, true);
+                    $ozonProductInfo = $this->getProductInfo($ozonProductId['product_id']);
 
                     if (isset($ozonProductInfo['result'])) {
                         $productVariant = app('db')->connection('mysql')->table('product_variant')
@@ -1737,8 +1750,7 @@ class OzonService
                     ->select('select pv.product_id as productId, p.description as description, pv.mall_variant_id as mallVariantId from product_variant pv
                         left join product p on p.id = pv.product_id
                         where ozon_product_id = ' . $item['product_id']);
-                $productResponse = $this->getProductFromOzon($item['product_id']);
-                $ozonProduct = json_decode($productResponse, true);
+                $ozonProduct = $this->getProductInfo($item['product_id']);
 
                 $productName = '';
                 $productImage = '';
@@ -2006,7 +2018,7 @@ class OzonService
                         'path' => trim(($path . ' -> ' . $category['title']), ' -> ')
                     ]);
                 } catch (\Exception $e) {
-                    $categoryResult = true;
+                    $categoryResult = false;
                 }
                 if ($categoryResult) {
                     $response = $this->sendData(str_replace('{category_id}', $category['category_id'], $this->categoryAttributeListUrl), null);
