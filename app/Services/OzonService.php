@@ -769,10 +769,12 @@ class OzonService
     {
         $result = [];
         $shippingError = false;
+        $newVariants = [];
 
         $productVariants = $this->getAllProductVariants($productId);
         if (isset($product['variants']) && count($product['variants']) > 0) {
             $mallVariantIds = [];
+            $mallVariantIdsFromDb = [];
             foreach ($product['variants'] as $key => $variant) {
                 array_push($mallVariantIds, $variant['mallVariantId']);
             }
@@ -780,6 +782,8 @@ class OzonService
             $deactivatedProductVariants = [];
             $activatedProductVariants = [];
             foreach ($productVariants as $key => $productVariant) {
+                array_push($mallVariantIdsFromDb, $productVariant->mallVariantId);
+
                 if (!in_array($productVariant->mallVariantId, $mallVariantIds)) {
                     if ($productVariant->ozonProductId != null) {
                         $this->deactivateProduct($productVariant->ozonProductId);
@@ -804,6 +808,11 @@ class OzonService
             }
 
             foreach ($product['variants'] as $key => $variant) {
+                if (!in_array($variant['mallVariantId'], $mallVariantIdsFromDb)) {
+                    array_push($newVariants, $variant);
+                    continue;
+                }
+
                 $item = [];
 
                 if (isset($variant['priceRaw'])) {
@@ -848,13 +857,18 @@ class OzonService
 
                 array_push($result, $this->updateOzonProduct($item, $productId, $variant['mallVariantId']));
             }
-        }elseif(isset($product['enabled'])) {
+        }
+        else if (isset($product['enabled'])) {
             foreach ($productVariants as $key => $productVariant) {
                 $item = [
                     'enabled' => $product['enabled']
                 ];
                 array_push($result, $this->updateOzonProduct($item, $productId, $productVariant->mallVariantId));
             }
+        }
+
+        if (count($newVariants) > 0) {
+            $variantIds = $this->createVariants($newVariants, $productId);
         }
         
         return $result;
@@ -1591,7 +1605,7 @@ class OzonService
     {
         $to = new DateTime('now');
         $since = new DateTime('now');
-        $since->modify('-3 day');
+        $since->modify('-7 day');
         $data = [
             'since' => $since->format('Y-m-d') . 'T' . $since->format('H:i:s') .'.000Z',
             'to' => $to->format('Y-m-d') . 'T' . $to->format('H:i:s') .'.999Z',
