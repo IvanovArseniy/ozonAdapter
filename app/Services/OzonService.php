@@ -869,6 +869,18 @@ class OzonService
 
         if (count($newVariants) > 0) {
             $variantIds = $this->createVariants($newVariants, $productId);
+            $imageUrl = app('db')->connection('mysql')->select('
+                select i.image_url as imageUrl from product_variant pv
+                    left join product_variant_image pvi on pv.id = pvi.product_variant_id
+                    left join image i on i.id = pvi.image_id where pv.product_id = ' . $productId . '
+                    and i.is_default = 1 and i.deleted = 0 limit 1');
+
+            Log::info(json_encode($imageUrl));
+            if ($imageUrl) {
+                Log::info(json_encode($imageUrl[0]->imageUrl));
+                $this->addMainImage($productId, $imageUrl[0]->imageUrl);
+            }
+
         }
         
         return $result;
