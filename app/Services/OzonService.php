@@ -491,7 +491,7 @@ class OzonService
             }
             app('db')->connection('mysql')->table('product_variant')
                 ->where('id', $variant->id)
-                ->update($updatedFields);
+                ->update($updateFields);
         }
 
         return array_values($errors);
