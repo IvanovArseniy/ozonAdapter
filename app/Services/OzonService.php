@@ -473,7 +473,7 @@ class OzonService
         $variants = app('db')->connection('mysql')->table('product_variant')
             ->whereNull('ozon_product_id')
             ->where('sent', 1)
-            ->orderBy('sent_date','desc')
+            ->orderBy('sent_date','asc')
             ->take(20)
             ->get();
 
@@ -481,14 +481,17 @@ class OzonService
         foreach ($variants as $key => $variant) {
             $response = $this->getProductFromOzonByOfferId($variant->mall_variant_id);
             $ozonProduct = json_decode($response, true);
+            $updateFields = [];
             if(isset($ozonProduct['result'])) {
-                app('db')->connection('mysql')->table('product_variant')
-                    ->where('id', $variant->id)
-                    ->update(['ozon_product_id' => $ozonProduct['result']['id']]);
+                $updateFields = ['ozon_product_id' => $ozonProduct['result']['id']];
             }
             else {
                 $errors[$variant->product_id] = 'Product with id=' . $variant->product_id . ' not created yet in ozon';
+                $updateFields = ['sent_date' => date('Y-m-d\TH:i:s.u')];
             }
+            app('db')->connection('mysql')->table('product_variant')
+                ->where('id', $variant->id)
+                ->update($updatedFields);
         }
 
         return array_values($errors);
