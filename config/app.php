@@ -61,5 +61,10 @@ return [
     ],
 
     'sync_portion' => 100,
-    'shipping_rf_code' => 'eecb1edb-d647-479f-aa6e-a2e3c5f16be4'
+    'shipping_rf_code' => 'eecb1edb-d647-479f-aa6e-a2e3c5f16be4',
+
+    'eddy_base_url' => 'https://mallmycom.helpdeskeddy.com/api/v2',
+    'eddy_get_tickets_url' => '/tickets/',
+    'eddy_api_key' => 'a51d05f2-c706-486e-9304-a938249c2353',
+    'eddy_login' => 'sergey.chernov@corp.mail.ru'
 ];
