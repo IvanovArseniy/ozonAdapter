@@ -421,6 +421,7 @@ class OzonService
     {
         $variants = app('db')->connection('mysql')->table('product_variant')
             ->where('sent', 1)
+            ->where('deleted', 0)
             ->whereNotNull('ozon_product_id')
             ->orderBy('sent_date','asc')
             ->skip($offset)
@@ -1761,7 +1762,6 @@ class OzonService
             ];
         }
         $order =  $this->getOzonOrderInfo($orderResult->ozon_order_id);
-        $order['createDate'] = $orderResult->create_date;
         return $order;
     }
 
@@ -1830,6 +1830,8 @@ class OzonService
 
     protected function mapOrder($order)
     {
+        $date = new \DateTime($order['order_time']);
+        $date->modify('+3 hour');
         $status = $this->mapOrderStatus($order['status']);
         $response = [
             'order_id' => $order['order_nr'],
@@ -1839,6 +1841,7 @@ class OzonService
             'email' => $order['address']['email'],
             //'ipAddress': {ipAddress}, ??
             'refererUrl' => 'http://ozon.ru/',
+            'createDate' => $date->format('Y-m-d H:i:s'),
             'shippingPerson' => [
                 'name' => $order['address']['addressee'],
                 'phone' => $order['address']['phone'],
