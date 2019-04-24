@@ -65,6 +65,8 @@ return [
 
     'eddy_base_url' => 'https://mallmycom.helpdeskeddy.com/api/v2',
     'eddy_get_tickets_url' => '/tickets/',
+    'eddy_get_tickets_fields_url' => '/custom_fields/',
     'eddy_api_key' => 'a51d05f2-c706-486e-9304-a938249c2353',
-    'eddy_login' => 'sergey.chernov@corp.mail.ru'
+    'eddy_login' => 'julia.novikova@corp.mail.ru',
+    'eddy_add_ticket_url' => '/tickets/',
 ];
