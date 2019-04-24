@@ -1619,15 +1619,7 @@ class OzonService
     ////Orders
     public function getOrderList()
     {
-        $to = new DateTime('now');
-        $since = new DateTime('now');
-        $since->modify('-7 day');
         $data = [
-            'since' => $since->format('Y-m-d') . 'T' . $since->format('H:i:s') .'.000Z',
-            'to' => $to->format('Y-m-d') . 'T' . $to->format('H:i:s') .'.999Z',
-            //'since' => $since->format('Y-m-d\TH:i:s.u'),
-            //'to' => $to->format('Y-m-d\TH:i:s.u'),
-            'status' => config('app.ozon_order_status.AWAITING_APPROVE'),
             'delivery_schema' => 'crossborder'
         ];
 

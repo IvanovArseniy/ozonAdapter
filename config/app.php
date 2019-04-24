@@ -19,7 +19,7 @@ return [
     'ozon_productlist_url' => '/v1/product/list',
     'ozon_product_group_attribute' => 8292,
 
-    'ozon_orderlist_url' => '/v1/order/list',
+    'ozon_orderlist_url' => '/v1/order/unfulfilled',
     'ozon_orderinfo_url' => '/v1/order/{orderId}?translit=true',
     'ozon_approveorder_url' => '/v1/order/items/approve/crossborder',
     'ozon_cancelorder_url' => '/v1/order/items/cancel/crossborder',
