@@ -15,12 +15,17 @@ use Laravel\Lumen\Routing\Controller as BaseController;
 class ChatController extends BaseController
 {
     public function SyncChat(OzonService $os, EddyService $es){
-        /*get ozon chat list*/
-        $chatList = $os->sendData('/v1/chat/list',['page_size'=>100]);
-        $arChats = json_decode($chatList ,1);
-        //$added = $es->addTicket($testChat);
-        $currentEddyTickets = $es->getTickets();
-        $arTickets = json_decode($currentEddyTickets,1);
-        //return response()->json($currentEddyTickets );
+
+        /*$currentEddyTickets = json_decode($es->getTickets(['status_list'=>'open','search'=>'Ozon order number']),1);
+        var_dump($currentEddyTickets);
+
+
+        $chatList = json_decode($os->getChats(),1);
+        var_dump($chatList);*/
+
+        $es->addMessage(303896,'testmess');
+
+
+
     }
 }

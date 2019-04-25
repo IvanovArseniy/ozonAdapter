@@ -2114,11 +2114,14 @@ class OzonService
         }
     }
 
-
+    public function getChats(){
+        $chatList = $this->sendData('/v1/chat/list',['page_size'=>100]);
+        return $chatList;
+    }
     ////Common
 
-    //временно public
-    public function sendData($url, $data)
+
+    private function sendData($url, $data)
     {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $url);

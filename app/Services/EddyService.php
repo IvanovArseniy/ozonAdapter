@@ -16,6 +16,7 @@ class EddyService
     protected $getTicketsFieldsUrl;
 
     protected $addTicketUrl;
+    protected $addMessageUrl;
 
     public function __construct(){
         $this->baseUrl = config('app.eddy_base_url');
@@ -23,6 +24,7 @@ class EddyService
         $this->getTicketsFieldsUrl = config('app.eddy_get_tickets_fields_url');
 
         $this->addTicketUrl = config('app.eddy_add_ticket_url');
+        $this->addMessageUrl = config('app.eddy_add_message_url');
     }
 
     private function sendData($url, $data = [], $usePost = false){
@@ -66,6 +68,12 @@ class EddyService
         return $addTicketResponse;
     }
 
+    public function addMessage($ticket,$text){
+        $url = str_replace('{ticketId}', $ticket, $this->addMessageUrl );
+        $messageData = $this->sendData($url,['text'=>$text], true);
+        return $messageData;
+    }
+
     public static function convertChatData($chatData){
         return [
             'title' => 'Ozon order number: ' . $chatData['order_number'],
@@ -74,4 +82,6 @@ class EddyService
 
         ];
     }
+
+
 }
