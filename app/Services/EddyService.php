@@ -69,8 +69,9 @@ class EddyService
     public static function convertChatData($chatData){
         return [
             'title' => 'Ozon order number: ' . $chatData['order_number'],
-            'description' => '<p> privet </p>',
+            'description' => 'Ozon order number: ' . $chatData['order_number'],
             'owner_id' => '2116',
+
         ];
     }
 }
