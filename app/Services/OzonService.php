@@ -2118,6 +2118,13 @@ class OzonService
         $chatList = $this->sendData('/v1/chat/list',['page_size'=>100]);
         return $chatList;
     }
+    public function getChatMessage($chatId, $messageId){
+        $messageData = $this->sendData('/v1/chat/history',['chat_id'=>$chatId,'from_message_id'=>$messageId, 'limit'=>'1']);
+        //return $messageData;
+        return json_decode($messageData,1);
+    }
+
+
     ////Common
 
 

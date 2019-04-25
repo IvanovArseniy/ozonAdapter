@@ -8,6 +8,7 @@
 
 namespace App\Services;
 
+use App\Services\OzonService;
 
 class EddyService
 {
@@ -44,8 +45,8 @@ class EddyService
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS,$queryString);
         }
-        var_dump($url);
-        //die();
+
+
         $response = curl_exec($ch);
         curl_close($ch);
         return $response;
@@ -62,9 +63,18 @@ class EddyService
         return $fieldsResponse;
     }
 
-    public function addTicket($chatData){
+    public function addTicket($chatData, OzonService $ozon){
         $eddyData = self::convertChatData($chatData);
-        $addTicketResponse = $this->sendData($this->addTicketUrl,$eddyData,true);
+        $addTicketResponse = json_decode($this->sendData($this->addTicketUrl,$eddyData,true),1);
+
+        if ($chatData['last_message_id'] > 0){
+            $chatId = $chatData['id'];
+            $messId = $chatData['last_message_id'];
+            $lastMess = $ozon->getChatMessage($chatId, $messId);
+            if (!empty($lastMess['result'])){
+                $this->addMessage($addTicketResponse['data']['id'],$lastMess['result']['0']['text']);
+            }
+        }
         return $addTicketResponse;
     }
 
@@ -72,6 +82,23 @@ class EddyService
         $url = str_replace('{ticketId}', $ticket, $this->addMessageUrl );
         $messageData = $this->sendData($url,['text'=>$text], true);
         return $messageData;
+    }
+
+    public static function getOzonOrderNumber($title){
+        $exploded = explode(':', $title);
+        if (!empty($exploded[1])){
+            return trim($exploded[1]);
+        }
+        return false;
+    }
+
+    public static function prepareList($list){
+        $preparedData = [];
+        foreach ($list['data'] as $ticketID => $ticketData){
+            $ozonOrderNum = self::getOzonOrderNumber($ticketData['title']);
+            $preparedData[$ozonOrderNum] = $ticketData;
+        }
+        return $preparedData;
     }
 
     public static function convertChatData($chatData){
