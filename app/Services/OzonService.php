@@ -1632,17 +1632,16 @@ class OzonService
         $notifyingOrderIds = [];
         $ozonOrders = $result['result'];
 
-        $toApprove = [];
+        $toApprove = [];//список пришедших заказов от ozon'а
         foreach ($ozonOrders as $key => $ozonOrder) {
             $existedOrder = app('db')->connection('mysql')->table('orders')
                 ->where('ozon_order_id', $ozonOrder['order_id'])
                 ->first();
 
-            $toApprove[$ozonOrder['order_id']] = true;
+            $orderInfo = $this->getOzonOrderInfo($ozonOrder['order_id']);
+            $orderInfo = $orderInfo['result'];
+            $toApprove[$ozonOrder['order_nr']] = true;
             if (!$existedOrder) {
-                $orderInfo = $this->getOzonOrderInfo($ozonOrder['order_id']);
-                $orderInfo = $orderInfo['result'];
-
                 $orderResult = app('db')->connection('mysql')->table('orders')
                     ->insert([
                         'ozon_order_id' => $orderInfo['order_id'],
@@ -1652,62 +1651,55 @@ class OzonService
                         'ozon_order_nr' => $orderInfo['order_nr']
                     ]);
                 if ($orderResult) {
-                    //$statusResult = $this->setOrderStatus($ozonOrder['order_id'], config('app.order_approve_status'), null, null);
-
-                    //if (isset($statusResult['response']) && !is_null($statusResult['response']) && !isset($statusResult['response']['error'])) {
-                        array_push($notifyingOrderIds, $orderInfo['order_nr']);
-                        array_push($notifyingOrders, [
-                            'data' => null,
-                            'type' => 'create',
-                            'notified' => 0,
-                            'order_id' => $orderInfo['order_id']
-                        ]);
-                    ///
+                    array_push($notifyingOrderIds, $orderInfo['order_nr']);
+                    array_push($notifyingOrders, [
+                        'data' => null,
+                        'type' => 'create',
+                        'notified' => 0,
+                        'order_id' => $orderInfo['order_id']
+                    ]);
                 }
             } else {
                 //Заказ уже есть, проверяем не вышло ли 4 часа для отмены
-                $orderInfo = $this->getOzonOrderInfo($ozonOrder['order_id']);
-                $dt = new \DateTime($orderInfo['result']['order_time']);
+                $dt = new \DateTime($orderInfo['order_time']);
                 $dt->modify('+3 hour');
-                $dt->add(new \DateInterval('P4H'));
+                $dt->add(new \DateInterval('PT4H'));
                 $dtnow = new \DateTime();
+                $dtnow->modify('+3 hour');
                 if($dtnow > $dt){
-                    //4 часа вышло - аппруваем на ozon'е
+                    //4 часа вышло - пора аппрувить на ozon'е
                     $statusResult = $this->setOrderStatus($ozonOrder['order_id'], config('app.order_approve_status'), null, null);
-                    if (isset($statusResult['response']) && !is_null($statusResult['response']) && !isset($statusResult['response']['error']))
-                    {
-                        //апрув в ozon'е прошёл. Апруваем в DS
-                        $DSS = new \App\Services\DropshippService();
-                        $result = $DSS->ApproveOrder($orderInfo['result']['order_nr']); //апрувим в DS
-                        if (isset($result['error'])) {
-                            //В ozon'е заапрувили, а в DS или в моле - ошибка
-                            //если isset $result['mall_response_http_code'] - , то ошибка от мола
-                            //если isset $result['mall_response_body']      - , то ошибка от мола
-                        }
+                    if (isset($statusResult['response']) && !is_null($statusResult['response']) && !isset($statusResult['response']['error'])) {
+                        //апрув в ozon'е прошёл. Надо заапрувить в DS
+                        array_push($notifyingOrderIds, $orderInfo['order_nr']);
+                        array_push($notifyingOrders, [
+                            'data' => null,
+                            'type' => 'approve',
+                            'notified' => 0,
+                            'order_id' => $orderInfo['order_id']
+                        ]);
                     }
                 }
             }
         }
 
-        app('db')->connection('mysql')->table('order_notification')
-            ->insert($notifyingOrders);
-
         //Проверка на отмену
-        $Orders = app('db')->connection('mysql')->table('orders')->where('status', ???);
-        foreach ($Orders as $iorder) {
-            if(!isset($toApprove[$iorder->ozon_order_id])){
-                $DSS = new \App\Services\DropshippService();
-                $result = $DSS->DeclineOrder($iorder->ozon_order_id); //отменяем в DS
-                if (isset($result['error'])) {
-                    //если isset $result['mall_response_http_code'] - , то ошибка от мола
-                    //если isset $result['mall_response_body']      - , то ошибка от мола
-                }else{
-                    app('db')->connection('mysql')->table('orders')
-                        ->where('ozon_order_id', $iorder->ozon_order_id)
-                        ->update(['deleted' => 1]);
-                }
+        $orders = app('db')->connection('mysql')->table('orders')->where('status', config('app.order_status.AWAITING_APPROVE'))->where('deleted', 0);
+        foreach ($orders as $key => $order) {
+            if(!isset($toApprove[$iorder->ozon_order_nr])){
+                //от ozon'а не пришёл - отменён
+                array_push($notifyingOrderIds, $orders->ozon_order_nr);
+                array_push($notifyingOrders, [
+                    'data' => null,
+                    'type' => 'decline',
+                    'notified' => 0,
+                    'order_id' => $order->ozon_order_id
+                ]);
             }
         }
+
+        app('db')->connection('mysql')->table('order_notification')
+            ->insert($notifyingOrders);
 
         return $notifyingOrderIds;
     }

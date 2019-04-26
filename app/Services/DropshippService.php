@@ -9,6 +9,7 @@ class DropshippService
     protected $tokenUrl;
 
     protected $orderUrl;
+    protected $orderUrlAction;
     protected $setOrderStatusUrl;
 
     protected $updateProductUrl;
@@ -18,6 +19,7 @@ class DropshippService
         $this->baseUrl = config('app.dropshipp_base_url');
         $this->tokenUrl = config('app.dropshipp_token_url');
         $this->orderUrl = config('app.dropshipp_order_url');
+        $this->orderUrlAction = config('app.dropshipp_order_url_action');
         $this->setOrderStatusUrl = '';
         $this->updateProductUrl = config('app.dropshipp_updateproduct_url');
     }
@@ -58,6 +60,28 @@ class DropshippService
                 $result = $this->notifyDeletedOrder($notification->ozonOrderNr);
                 if (!isset($result['error'])) {
                     array_push($notificationResult, $result);
+                    $success = true;
+                }
+            }
+
+            if ($notification->type == 'approve') {
+                $result = $this->ApproveOrder($notification->ozonOrderNr);
+                if (!isset($result['error'])) {
+                    array_push($notificationResult, $result);
+                    app('db')->connection('mysql')->table('orders')
+                        ->where('ozon_order_id', $notification->order_id)
+                        ->update(['status' => config('app.order_status.AWAITING_PACKAGING')]);
+                    $success = true;
+                }
+            }
+
+            if ($notification->type == 'decline') {
+                $result = $this->DeclineOrder($notification->ozonOrderNr);
+                if (!isset($result['error'])) {
+                    array_push($notificationResult, $result);
+                    app('db')->connection('mysql')->table('orders')
+                        ->where('ozon_order_id', $notification->order_id)
+                        ->update(['deleted' => 1]);
                     $success = true;
                 }
             }
@@ -122,7 +146,7 @@ class DropshippService
     {
         Log::info('Approve order:' . json_encode($orderNr));
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl) . '/approve'));
+        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace(['{store_num}','{action}'], [$orderNr, 'approve'], $this->orderUrlAction)));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
         Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl) . '/approve'));
@@ -136,7 +160,7 @@ class DropshippService
     {
         Log::info('Decline order:' . json_encode($orderNr));
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl) . '/decline'));
+        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace(['{store_num}','{action}'], [$orderNr, 'decline'], $this->orderUrlAction)));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
         Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl) . '/decline'));

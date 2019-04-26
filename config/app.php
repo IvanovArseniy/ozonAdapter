@@ -35,6 +35,7 @@ return [
     'dropshipp_token_url' => '?-apikey={api_key}&token={owner_token}',
     //'dropshipp_order_url' => '/api/v1/orders/{owner_id}/{store_num}'
     'dropshipp_order_url' => '/api/v1/orders/1/{store_num}',
+    'dropshipp_order_url_action' => '/api/v1/orders/1/{store_num}/{action}',
 
     'dropshipp_updateproduct_url' => '/api/v1/products/1/{product_id}',
 
