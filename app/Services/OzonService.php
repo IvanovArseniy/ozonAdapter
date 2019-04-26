@@ -1632,11 +1632,13 @@ class OzonService
         $notifyingOrderIds = [];
         $ozonOrders = $result['result'];
 
+        $toApprove = [];
         foreach ($ozonOrders as $key => $ozonOrder) {
             $existedOrder = app('db')->connection('mysql')->table('orders')
                 ->where('ozon_order_id', $ozonOrder['order_id'])
                 ->first();
 
+            $toApprove[$ozonOrder['order_id']] = true;
             if (!$existedOrder) {
                 $orderInfo = $this->getOzonOrderInfo($ozonOrder['order_id']);
                 $orderInfo = $orderInfo['result'];
@@ -1650,9 +1652,9 @@ class OzonService
                         'ozon_order_nr' => $orderInfo['order_nr']
                     ]);
                 if ($orderResult) {
-                    $statusResult = $this->setOrderStatus($ozonOrder['order_id'], config('app.order_approve_status'), null, null);
+                    //$statusResult = $this->setOrderStatus($ozonOrder['order_id'], config('app.order_approve_status'), null, null);
 
-                    if (isset($statusResult['response']) && !is_null($statusResult['response']) && !isset($statusResult['response']['error'])) {
+                    //if (isset($statusResult['response']) && !is_null($statusResult['response']) && !isset($statusResult['response']['error'])) {
                         array_push($notifyingOrderIds, $orderInfo['order_nr']);
                         array_push($notifyingOrders, [
                             'data' => null,
@@ -1660,6 +1662,28 @@ class OzonService
                             'notified' => 0,
                             'order_id' => $orderInfo['order_id']
                         ]);
+                    ///
+                }
+            } else {
+                //Заказ уже есть, проверяем не вышло ли 4 часа для отмены
+                $orderInfo = $this->getOzonOrderInfo($ozonOrder['order_id']);
+                $dt = new \DateTime($orderInfo['result']['order_time']);
+                $dt->modify('+3 hour');
+                $dt->add(new \DateInterval('P4H'));
+                $dtnow = new \DateTime();
+                if($dtnow > $dt){
+                    //4 часа вышло - аппруваем на ozon'е
+                    $statusResult = $this->setOrderStatus($ozonOrder['order_id'], config('app.order_approve_status'), null, null);
+                    if (isset($statusResult['response']) && !is_null($statusResult['response']) && !isset($statusResult['response']['error']))
+                    {
+                        //апрув в ozon'е прошёл. Апруваем в DS
+                        $DSS = new \App\Services\DropshippService();
+                        $result = $DSS->ApproveOrder($orderInfo['result']['order_nr']); //апрувим в DS
+                        if (isset($result['error'])) {
+                            //В ozon'е заапрувили, а в DS или в моле - ошибка
+                            //если isset $result['mall_response_http_code'] - , то ошибка от мола
+                            //если isset $result['mall_response_body']      - , то ошибка от мола
+                        }
                     }
                 }
             }
@@ -1667,6 +1691,23 @@ class OzonService
 
         app('db')->connection('mysql')->table('order_notification')
             ->insert($notifyingOrders);
+
+        //Проверка на отмену
+        $Orders = app('db')->connection('mysql')->table('orders')->where('status', ???);
+        foreach ($Orders as $iorder) {
+            if(!isset($toApprove[$iorder->ozon_order_id]){
+                $DSS = new \App\Services\DropshippService();
+                $result = $DSS->DeclineOrder($iorder->ozon_order_id); //апрувим в DS
+                if (isset($result['error'])) {
+                    //если isset $result['mall_response_http_code'] - , то ошибка от мола
+                    //если isset $result['mall_response_body']      - , то ошибка от мола
+                } elseif{
+                    app('db')->connection('mysql')->table('orders')
+                        ->where('ozon_order_id', $iorder->ozon_order_id)
+                        ->update(['deleted' => 1]);
+                }
+            }
+        }
 
         return $notifyingOrderIds;
     }
@@ -1785,6 +1826,9 @@ class OzonService
     {
         $date = new \DateTime($order['order_time']);
         $date->modify('+3 hour');
+        $date_approve_at = new \DateTime($order['order_time']);
+        $date_approve_at->modify('+3 hour');
+        $date_approve_at->add(new \DateInterval('P3D'));
         $status = $this->mapOrderStatus($order['status']);
         $response = [
             'order_id' => $order['order_nr'],
@@ -1795,6 +1839,7 @@ class OzonService
             //'ipAddress': {ipAddress}, ??
             'refererUrl' => 'http://ozon.ru/',
             'createDate' => $date->format('Y-m-d H:i:s'),
+            'approve_at' => $date_approve_at->format('Y-m-d H:i:s'),
             'shippingPerson' => [
                 'name' => $order['address']['addressee'],
                 'phone' => $order['address']['phone'],

@@ -118,6 +118,34 @@ class DropshippService
         return json_decode($response, true);
     }
 
+    public function ApproveOrder($orderNr)
+    {
+        Log::info('Approve order:' . json_encode($orderNr));
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl) . '/approve'));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+        Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl) . '/approve'));
+        $response = curl_exec($ch);
+        curl_close($ch);
+        Log::info('Approve new order: ' . $response);
+        return json_decode($response, true);
+    }
+
+    public function DeclineOrder($orderNr)
+    {
+        Log::info('Decline order:' . json_encode($orderNr));
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl) . '/decline'));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+        Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl) . '/decline'));
+        $response = curl_exec($ch);
+        curl_close($ch);
+        Log::info('Decline new order: ' . $response);
+        return json_decode($response, true);
+    }
+
     public function getOrderList(Type $var = null)
     {
         # code...
