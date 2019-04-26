@@ -70,7 +70,7 @@ class DropshippService
                     array_push($notificationResult, $result);
                     app('db')->connection('mysql')->table('orders')
                         ->where('ozon_order_id', $notification->ozonOrderId)
-                        ->update(['status' => config('app.order_status.AWAITING_PACKAGING')]);
+                        ->update(['status' => config('app.ozon_order_status.AWAITING_PACKAGING')]);
                     $success = true;
                 }
             }

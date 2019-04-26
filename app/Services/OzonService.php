@@ -1685,14 +1685,14 @@ class OzonService
 
         //Проверка на отмену
         $orders = app('db')->connection('mysql')->table('orders')
-            ->where('status', config('app.order_status.AWAITING_APPROVE'))
+            ->where('status', config('app.ozon_order_status.AWAITING_APPROVE'))
             ->where('deleted', 0)
             ->get();
         if ($orders) {
             foreach ($orders as $key => $order) {
-                if(!isset($toApprove[$iorder->ozon_order_nr])){
+                if(!isset($toApprove[$order->ozon_order_nr])){
                     //от ozon'а не пришёл - отменён
-                    array_push($notifyingOrderIds, $orders->ozon_order_nr);
+                    array_push($notifyingOrderIds, $order->ozon_order_nr);
                     array_push($notifyingOrders, [
                         'data' => null,
                         'type' => 'decline',
