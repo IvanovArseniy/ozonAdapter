@@ -1695,13 +1695,13 @@ class OzonService
         //Проверка на отмену
         $Orders = app('db')->connection('mysql')->table('orders')->where('status', ???);
         foreach ($Orders as $iorder) {
-            if(!isset($toApprove[$iorder->ozon_order_id]){
+            if(!isset($toApprove[$iorder->ozon_order_id])){
                 $DSS = new \App\Services\DropshippService();
-                $result = $DSS->DeclineOrder($iorder->ozon_order_id); //апрувим в DS
+                $result = $DSS->DeclineOrder($iorder->ozon_order_id); //отменяем в DS
                 if (isset($result['error'])) {
                     //если isset $result['mall_response_http_code'] - , то ошибка от мола
                     //если isset $result['mall_response_body']      - , то ошибка от мола
-                } elseif{
+                }else{
                     app('db')->connection('mysql')->table('orders')
                         ->where('ozon_order_id', $iorder->ozon_order_id)
                         ->update(['deleted' => 1]);
