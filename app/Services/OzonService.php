@@ -1836,7 +1836,7 @@ class OzonService
             //'ipAddress': {ipAddress}, ??
             'refererUrl' => 'http://ozon.ru/',
             'createDate' => $date->format('Y-m-d H:i:s'),
-            'approve_at' => $date_approve_at->format('Y-m-d H:i:s'),
+            'approveAt' => $date_approve_at->format('Y-m-d H:i:s'),
             'shippingPerson' => [
                 'name' => $order['address']['addressee'],
                 'phone' => $order['address']['phone'],
