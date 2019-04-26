@@ -1640,7 +1640,7 @@ class OzonService
 
             $orderInfo = $this->getOzonOrderInfo($ozonOrder['order_id']);
             $orderInfo = $orderInfo['result'];
-            $toApprove[$ozonOrder['order_nr']] = true;
+            $toApprove[$orderInfo['order_nr']] = true;
             if (!$existedOrder) {
                 $orderResult = app('db')->connection('mysql')->table('orders')
                     ->insert([
@@ -1684,17 +1684,22 @@ class OzonService
         }
 
         //Проверка на отмену
-        $orders = app('db')->connection('mysql')->table('orders')->where('status', config('app.order_status.AWAITING_APPROVE'))->where('deleted', 0);
-        foreach ($orders as $key => $order) {
-            if(!isset($toApprove[$iorder->ozon_order_nr])){
-                //от ozon'а не пришёл - отменён
-                array_push($notifyingOrderIds, $orders->ozon_order_nr);
-                array_push($notifyingOrders, [
-                    'data' => null,
-                    'type' => 'decline',
-                    'notified' => 0,
-                    'order_id' => $order->ozon_order_id
-                ]);
+        $orders = app('db')->connection('mysql')->table('orders')
+            ->where('status', config('app.order_status.AWAITING_APPROVE'))
+            ->where('deleted', 0)
+            ->get();
+        if ($orders) {
+            foreach ($orders as $key => $order) {
+                if(!isset($toApprove[$iorder->ozon_order_nr])){
+                    //от ozon'а не пришёл - отменён
+                    array_push($notifyingOrderIds, $orders->ozon_order_nr);
+                    array_push($notifyingOrders, [
+                        'data' => null,
+                        'type' => 'decline',
+                        'notified' => 0,
+                        'order_id' => $order->ozon_order_id
+                    ]);
+                }
             }
         }
 

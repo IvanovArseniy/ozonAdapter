@@ -69,7 +69,7 @@ class DropshippService
                 if (!isset($result['error'])) {
                     array_push($notificationResult, $result);
                     app('db')->connection('mysql')->table('orders')
-                        ->where('ozon_order_id', $notification->order_id)
+                        ->where('ozon_order_id', $notification->ozonOrderId)
                         ->update(['status' => config('app.order_status.AWAITING_PACKAGING')]);
                     $success = true;
                 }
@@ -80,7 +80,7 @@ class DropshippService
                 if (!isset($result['error'])) {
                     array_push($notificationResult, $result);
                     app('db')->connection('mysql')->table('orders')
-                        ->where('ozon_order_id', $notification->order_id)
+                        ->where('ozon_order_id', $notification->ozonOrderId)
                         ->update(['deleted' => 1]);
                     $success = true;
                 }
