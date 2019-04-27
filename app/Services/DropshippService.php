@@ -37,7 +37,7 @@ class DropshippService
         $notifications = app('db')->connection('mysql')
             ->select('select no.id as id, no.type as type, no.data as data, o.ozon_order_id as ozonOrderId, o.ozon_order_nr as ozonOrderNr from order_notification no
                 left join orders o on o.ozon_order_id = no.order_id
-                where notified = 0 order by no.id asc limit 20');
+                where notified = 0 and type != \'approve\' order by no.id asc limit 20');
 
         $notificationResult = [];
         foreach ($notifications as $key => $notification) {
@@ -68,9 +68,6 @@ class DropshippService
                 $result = $this->ApproveOrder($notification->ozonOrderNr);
                 if (!isset($result['error'])) {
                     array_push($notificationResult, $result);
-                    app('db')->connection('mysql')->table('orders')
-                        ->where('ozon_order_id', $notification->ozonOrderId)
-                        ->update(['status' => config('app.ozon_order_status.AWAITING_PACKAGING')]);
                     $success = true;
                 }
             }
@@ -79,9 +76,6 @@ class DropshippService
                 $result = $this->DeclineOrder($notification->ozonOrderNr);
                 if (!isset($result['error'])) {
                     array_push($notificationResult, $result);
-                    app('db')->connection('mysql')->table('orders')
-                        ->where('ozon_order_id', $notification->ozonOrderId)
-                        ->update(['deleted' => 1]);
                     $success = true;
                 }
             }
