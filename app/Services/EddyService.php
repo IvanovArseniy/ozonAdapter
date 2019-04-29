@@ -42,17 +42,24 @@ class EddyService
         curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
         curl_setopt($ch, CURLOPT_USERPWD, config('app.eddy_login') . ':' . config('app.eddy_api_key'));
         if ($usePost){
-            $queryString = json_encode($data);
+            //$queryString = json_encode($data);
+            var_dump(strlen($queryString));
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS,$queryString);
             curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-                    'Content-Type: application/json',
+                    //'Content-Type: application/json',
+                    'Content-Type: application/x-www-form-urlencoded',
+                    'Cache-Control: no-cache',
                     'Content-Length: ' . strlen($queryString),
 
                 )
             );
         }
         $response = curl_exec($ch);
+        if($response === false)
+        {
+            var_dump( 'Ошибка curl: ' . curl_error($ch));
+        }
         curl_close($ch);
         return $response;
 
@@ -74,9 +81,15 @@ class EddyService
         return $addTicketResponse;
     }
 
-    public function addMessage($ticket,$text){
+    public function addMessage($ticket,$text,$files = null){
         $url = str_replace('{ticketId}', $ticket, $this->addMessageUrl );
-        $addMessageResponse = json_decode( $this->sendData($url,['text'=>$text], true),1);
+        $messagePayload = ['text'=>$text];
+        if (is_array($files) && !empty($files)){
+            $messagePayload['files'] = $files;
+        }
+        var_dump($messagePayload);
+
+        $addMessageResponse = json_decode( $this->sendData($url,$messagePayload, true),1);
         return $addMessageResponse;
     }
 
