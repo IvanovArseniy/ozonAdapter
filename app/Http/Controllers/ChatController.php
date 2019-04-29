@@ -18,13 +18,66 @@ class ChatController extends BaseController
         $currentEddyTickets = json_decode($es->getTickets(['status_list'=>'open','search'=>'Ozon order number','owner_list'=>'2116']),1);
         $preparedTickets = $es::prepareList($currentEddyTickets);
         $chatList = json_decode($os->getChats(),1);
+        if (is_array($chatList['result']) && !empty($chatList['result'])){
+            $ticketsCount = 0;
+            foreach ($chatList['result'] as $key => $chatData){
+                var_dump($chatData);
+                $isTicketExists = array_key_exists($chatData['order_number'], $preparedTickets);
+                if (!$isTicketExists){
+                    $addTicketResponse = $es->addTicket($chatData, $os);
+                    $ticketsCount += 1;
+                }
+                else{
 
-        var_dump($chatList);
-        var_dump($preparedTickets);
-        die();
+                    $lastAddedEddyMessage = app('db')->connection('mysql')->table('chat_sync')
+                        ->where('order_id', $chatData['order_number'])
+                        ->first();
+
+                    $fromMessage = null;
+                    $dbAction = 'insert';
+                    if ($lastAddedEddyMessage){
+                        $fromMessage = $lastAddedEddyMessage->last_message_id;
+                        $dbAction = 'update';
+                    }
+
+                    $chatMessages = $os->getChatMessages($chatData['id'], $fromMessage, 2);
+//                    var_dump($chatMessages);
+//                    die();
+                    $messagesCounter = 0;
+                    foreach ($chatMessages['result'] as $key => $chatMessage){
+                        if ($chatMessage['type'] == 'file'){
+                            $eddyMessageText = "@file@".$chatMessage['id'];
+                        }
+                        else{
+                            $eddyMessageText = $chatMessage['text'];
+                        }
+                        var_dump($eddyMessageText);
+                        //die();
+                        $messagesCounter = $key;
+                        $ticketId = $preparedTickets[ $chatData['order_number'] ]['id'];
+                        $addMessageResponse = $es->addMessage($ticketId, $eddyMessageText);
+
+                    }
+                    $lastEddyMessageId = $chatMessages['result'][$messagesCounter]['id'];
+                    app('db')->connection('mysql')->table('chat_sync')
+                        ->$dbAction([
+                            'order_id' => $chatData['order_number'],
+                            'last_message_id' => $lastEddyMessageId,
+                        ]);
+                    var_dump($messagesCounter);
+                    //die();
+                }
+            }
+        }
+
+        var_dump('Done');
+        var_dump('Add ' . $ticketsCount . ' tickets');
 
 
-        foreach ($chatList['result'] as $key => $chatData){
+
+
+
+        /*foreach ($chatList['result'] as $key => $chatData){
             $needSync = true;
             //Заявка по заказу чата уже есть
             if (array_key_exists($chatData['order_number'], $preparedTickets)){
@@ -77,8 +130,7 @@ class ChatController extends BaseController
             else{
                 $es->addTicket($chatData, $os);
             }
-        }
-        var_dump('done');
+        }*/
     }
 
 }

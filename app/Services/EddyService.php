@@ -42,8 +42,15 @@ class EddyService
         curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
         curl_setopt($ch, CURLOPT_USERPWD, config('app.eddy_login') . ':' . config('app.eddy_api_key'));
         if ($usePost){
+            $queryString = json_encode($data);
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS,$queryString);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+                    'Content-Type: application/json',
+                    'Content-Length: ' . strlen($queryString),
+
+                )
+            );
         }
         $response = curl_exec($ch);
         curl_close($ch);
@@ -61,41 +68,15 @@ class EddyService
         return $fieldsResponse;
     }
 
-    public function addTicket($chatData, OzonService $ozon){
+    public function addTicket($chatData){
         $eddyData = self::convertChatData($chatData);
         $addTicketResponse = json_decode($this->sendData($this->addTicketUrl,$eddyData,true),1);
-        if ($chatData['last_message_id'] > 0){
-            $chatId = $chatData['id'];
-            $messId = $chatData['last_message_id'];
-            $chatMessages = $ozon->getChatMessages($chatId);
-
-            if (!empty($chatMessages['result'])){
-
-                foreach ($chatMessages['result'] as $key =>  $chatMessage){
-                    if (!empty($chatMessage['text'])){
-                       $this->addMessage($addTicketResponse['data']['id'],$chatMessage['text']);
-                    }
-                }
-            }
-
-            if ($chatMessages['result'][count($chatMessages['result']) - 1]['type'] == 'text'){
-                $lastChatMessageId = $chatMessages['result'][count($chatMessages['result']) - 1]['id'];
-                app('db')->connection('mysql')->table('chat_sync')
-                    ->insert([
-                        'last_message_id' => $lastChatMessageId,
-                        'order_id' => $chatData['order_number']
-                    ]);
-            }
-
-        }
-
-
         return $addTicketResponse;
     }
 
     public function addMessage($ticket,$text){
         $url = str_replace('{ticketId}', $ticket, $this->addMessageUrl );
-        $addMessageResponse = $this->sendData($url,['text'=>$text], true);
+        $addMessageResponse = json_decode( $this->sendData($url,['text'=>$text], true),1);
         return $addMessageResponse;
     }
 
