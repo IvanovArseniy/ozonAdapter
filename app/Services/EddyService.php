@@ -45,8 +45,6 @@ class EddyService
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS,$queryString);
         }
-
-
         $response = curl_exec($ch);
         curl_close($ch);
         return $response;
@@ -66,22 +64,39 @@ class EddyService
     public function addTicket($chatData, OzonService $ozon){
         $eddyData = self::convertChatData($chatData);
         $addTicketResponse = json_decode($this->sendData($this->addTicketUrl,$eddyData,true),1);
-
         if ($chatData['last_message_id'] > 0){
             $chatId = $chatData['id'];
             $messId = $chatData['last_message_id'];
-            $lastMess = $ozon->getChatMessage($chatId, $messId);
-            if (!empty($lastMess['result'])){
-                $this->addMessage($addTicketResponse['data']['id'],$lastMess['result']['0']['text']);
+            $chatMessages = $ozon->getChatMessages($chatId);
+
+            if (!empty($chatMessages['result'])){
+
+                foreach ($chatMessages['result'] as $key =>  $chatMessage){
+                    if (!empty($chatMessage['text'])){
+                       $this->addMessage($addTicketResponse['data']['id'],$chatMessage['text']);
+                    }
+                }
             }
+
+            if ($chatMessages['result'][count($chatMessages['result']) - 1]['type'] == 'text'){
+                $lastChatMessageId = $chatMessages['result'][count($chatMessages['result']) - 1]['id'];
+                app('db')->connection('mysql')->table('chat_sync')
+                    ->insert([
+                        'last_message_id' => $lastChatMessageId,
+                        'order_id' => $chatData['order_number']
+                    ]);
+            }
+
         }
+
+
         return $addTicketResponse;
     }
 
     public function addMessage($ticket,$text){
         $url = str_replace('{ticketId}', $ticket, $this->addMessageUrl );
-        $messageData = $this->sendData($url,['text'=>$text], true);
-        return $messageData;
+        $addMessageResponse = $this->sendData($url,['text'=>$text], true);
+        return $addMessageResponse;
     }
 
     public static function getOzonOrderNumber($title){

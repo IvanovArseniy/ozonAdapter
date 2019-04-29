@@ -2115,12 +2115,11 @@ class OzonService
     }
 
     public function getChats(){
-        $chatList = $this->sendData('/v1/chat/list',['page_size'=>100]);
+        $chatList = $this->sendData('/v1/chat/list',['page_size'=>100, /*'chat_id_list'=>['dcdcb35a-713e-4035-8427-3359a247afa4']*/]);
         return $chatList;
     }
-    public function getChatMessage($chatId, $messageId){
-        $messageData = $this->sendData('/v1/chat/history',['chat_id'=>$chatId,'from_message_id'=>$messageId, 'limit'=>'1']);
-        //return $messageData;
+    public function getChatMessages($chatId, $messageId = null, $limit = 5){
+        $messageData = $this->sendData('/v1/chat/history',['chat_id'=>$chatId,'from_message_id'=>$messageId, 'limit'=>$limit]);
         return json_decode($messageData,1);
     }
 
