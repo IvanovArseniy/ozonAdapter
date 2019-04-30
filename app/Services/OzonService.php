@@ -1678,9 +1678,6 @@ class OzonService
                             'notified' => 0,
                             'order_id' => $orderInfo['order_id']
                         ]);
-                        app('db')->connection('mysql')->table('orders')
-                            ->where('ozon_order_id', $orderInfo['order_id'])
-                            ->update(['status' => config('app.ozon_order_status.AWAITING_PACKAGING')]);
                     }
                 }
             }
@@ -1917,6 +1914,9 @@ class OzonService
                     'item_ids' => $items
                 ]);
                 $response = json_decode($response, true);
+                app('db')->connection('mysql')->table('orders')
+                    ->where('ozon_order_id', $order['ozon_order_id'])
+                    ->update(['status' => config('app.ozon_order_status.AWAITING_PACKAGING')]);
                 Log::info($this->interactionId . ' => Approve ozon order result: ' . json_encode($response));
             }
             if(strtoupper($status) == strtoupper(config('app.order_cancel_status')))
