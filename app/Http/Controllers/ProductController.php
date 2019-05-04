@@ -201,4 +201,21 @@ class ProductController extends BaseController
         $dropshippService->notifyProducts($notifyingProductIds);
         return response()->json(['OK']);
     }
+
+    public function gearmanTry(OzonService $ozonService, DropshippService $dropshippService)
+    {
+        Log::info('Try add gearman job!');
+
+        $client = new \GearmanClient();
+        $client->addServers('localhost');
+
+        $data = [
+            'msg' => 'Test msg',
+            'ts' => time(),
+            'dt' => date('Y-m-d H:i:s'),
+        ];
+        $client->doBackground('main_test', json_encode($data));
+
+        return response()->json(['OK']);
+    }
 }

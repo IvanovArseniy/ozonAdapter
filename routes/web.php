@@ -43,6 +43,8 @@ $router->group(['prefix' => '1/tech', 'middleware' => 'auth'], function() use ($
     $router->get('/product/schedulejobs', 'ProductController@scheduleJobs');
     $router->get('/product/setstock', 'ProductController@setStock');
     $router->get('/order/setOrderNr', 'OrderController@setOrderNr');
+
+    $router->get('/product/gearman', 'ProductController@gearmanTry');
 });
 
 $router->group(['prefix' => '1/orders', 'middleware' => 'auth'], function() use ($router) {

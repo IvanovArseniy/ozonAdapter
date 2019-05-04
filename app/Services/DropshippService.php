@@ -234,4 +234,14 @@ class DropshippService
         Log::info('Delete product result: ' . $response);
         return json_decode($response, true);
     }
+
+    public static function gearmanWork(\GearmanJob $job)
+    {
+        $json_data = $job->workload();
+        $json_data = json_decode($json_data, true);
+
+        Log::info('gearmanWork:' . json_encode($json_data));
+
+        file_put_contents(storage_path() . '/app/gearmant_test', json_encode($json_data));
+    }
 }
