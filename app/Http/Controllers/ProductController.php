@@ -206,15 +206,11 @@ class ProductController extends BaseController
     {
         Log::info('Try add gearman job!');
 
-        $client = new \GearmanClient();
-        $client->addServers('localhost');
-
-        $data = [
+        GearmanService::add([
             'msg' => 'Test msg',
             'ts' => time(),
             'dt' => date('Y-m-d H:i:s'),
-        ];
-        $client->doBackground('main_test', json_encode($data));
+        ]);
 
         return response()->json(['OK']);
     }

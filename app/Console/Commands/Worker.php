@@ -14,7 +14,7 @@ class Worker extends Command
         $worker = new \GearmanWorker();
         $worker->addServer('localhost');
 
-        $worker->addFunction('main_test', '\App\Services\DropshippService::gearmanWork');
+        $worker->addFunction('main_test', '\App\Services\GearmanService::processStock');
 
         while (1) {
             $worker->work();

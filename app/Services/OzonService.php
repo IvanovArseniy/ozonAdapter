@@ -469,6 +469,25 @@ class OzonService
         }
     }
 
+    public function sendStockForProduct($stock)
+    {
+        $ozonProductResult = $this->getProductInfo($stock['product_id']);
+
+        if (isset($ozonProductResult['result'])) {
+            $quantityResults = $this->setQuantity([$stock]);
+            foreach ($quantityResults['result'] as $key => $quantityResult) {
+                if (isset($quantityResult['updated']) && boolval($quantityResult['updated'])) {
+                    $this->enableProduct(boolval($ozonProductResult['result']['visibility_details']['active_product']), $quantityResult['product_id']);
+                }
+                else {
+                    //TODO:remove sleep
+                    sleep(60);
+                    GearmanService::add($stock);
+                }
+            }
+        }
+    }
+
     public function setOzonProductId()
     {
         $variants = app('db')->connection('mysql')->table('product_variant')
@@ -851,10 +870,10 @@ class OzonService
                     $item['price'] = $price;
                 }
 
-
                 if (isset($variant['inventory']) && !is_null($variant['inventory'])) {
                     $item['quantity'] = $variant['inventory'];
                 }
+
                 if (isset($product['enabled'])) {
                     $item['enabled'] = $product['enabled'];
                 }
@@ -925,7 +944,7 @@ class OzonService
     {
         $productVariant = $this->getOzonProductId($productId, $mallVariantId);
         if ($productVariant['Success']) {
-            $this->saveProductVariant($product, $productId, $mallVariantId);
+            $this->saveProductVariant($product, $productId, $mallVariantId, $productVariant['ozonProductId']);
         }
         if ($productVariant['Success'] && !is_null($productVariant['ozonProductId'])) {
             $ozonProductResult = $this->getProductInfo($productVariant['ozonProductId']);
@@ -1030,23 +1049,21 @@ class OzonService
         else return $productVariant;
     }
 
-    protected function saveProductVariant($product, $productId, $mallVariantId)
+    protected function saveProductVariant($product, $productId, $mallVariantId, $ozonProductId)
     {
-        $updateFields = [];
-
         if (isset($product['quantity'])) {
-            $updateFields['inventory'] = $product['quantity'];
-            $updateFields['sent'] = 1;
-        }
+            app('db')->connection('mysql')->table('product_variant')
+                ->where('product_id', $productId)
+                ->where('mall_variant_id', $mallVariantId)
+                ->update([
+                    'inventory' => $product['quantity'], 
+                    'sent' => 1
+                ]);
 
-        if (count($updateFields) > 0) {
-            $productVariant = $this->getOzonProductId($productId, $mallVariantId);
-            if ($productVariant['Success']) {
-                app('db')->connection('mysql')->table('product_variant')
-                    ->where('product_id', $productId)
-                    ->where('mall_variant_id', $mallVariantId)
-                    ->update($updateFields);
-            }
+            GearmanService::add([
+                'product_id' => $ozonProductId,
+                'stock' => $product['quantity']
+            ]);
         }
     }
 
