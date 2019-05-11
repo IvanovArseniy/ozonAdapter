@@ -471,6 +471,7 @@ class OzonService
 
     public function sendStockForProduct($stock)
     {
+        $result = false;
         $ozonProductResult = $this->getProductInfo($stock['product_id']);
 
         if (isset($ozonProductResult['result'])) {
@@ -478,14 +479,11 @@ class OzonService
             foreach ($quantityResults['result'] as $key => $quantityResult) {
                 if (isset($quantityResult['updated']) && boolval($quantityResult['updated'])) {
                     $this->enableProduct(boolval($ozonProductResult['result']['visibility_details']['active_product']), $quantityResult['product_id']);
-                }
-                else {
-                    //TODO:remove sleep
-                    sleep(60);
-                    GearmanService::add($stock);
+                    $result = true;
                 }
             }
         }
+        return $result;
     }
 
     public function setOzonProductId()
@@ -1060,10 +1058,15 @@ class OzonService
                     'sent' => 1
                 ]);
 
-            GearmanService::add([
-                'product_id' => $ozonProductId,
-                'stock' => $product['quantity']
-            ]);
+            try {
+                GearmanService::add([
+                    'product_id' => $ozonProductId,
+                    'stock' => $product['quantity']
+                ]);
+            }
+            catch (\Exception $e) {
+                Log::error('Adding massage to gearman queue failed!');
+            }
         }
     }
 

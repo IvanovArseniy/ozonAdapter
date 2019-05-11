@@ -45,6 +45,7 @@ $router->group(['prefix' => '1/tech', 'middleware' => 'auth'], function() use ($
     $router->get('/order/setOrderNr', 'OrderController@setOrderNr');
 
     $router->get('/product/gearman', 'ProductController@gearmanTry');
+    $router->get('/queue/addForRetry', 'QueueController@addForRetry');
 });
 
 $router->group(['prefix' => '1/orders', 'middleware' => 'auth'], function() use ($router) {
