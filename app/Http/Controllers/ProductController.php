@@ -103,8 +103,8 @@ class ProductController extends BaseController
 
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Send stocks started!');
-        $result = $ozonService->sendStocks(0);
-        $result = $ozonService->sendStocks(0);
+        //$result = $ozonService->sendStocks(0);
+        //$result = $ozonService->sendStocks(0);
         Log::info($interactionId . ' => Send stocks ready!');
 
         unlink(storage_path() . '/app/setStock.lock');

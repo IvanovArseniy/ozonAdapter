@@ -1050,14 +1050,6 @@ class OzonService
     protected function saveProductVariant($product, $productId, $mallVariantId, $ozonProductId)
     {
         if (isset($product['quantity'])) {
-            app('db')->connection('mysql')->table('product_variant')
-                ->where('product_id', $productId)
-                ->where('mall_variant_id', $mallVariantId)
-                ->update([
-                    'inventory' => $product['quantity'], 
-                    'sent' => 1
-                ]);
-
             try {
                 GearmanService::add([
                     'product_id' => $ozonProductId,

@@ -15,8 +15,8 @@ class GearmanService
 
     public static function processStock(\GearmanJob $job)
     {
-        $json_data = $job->workload();
-        $json_data = json_decode($json_data, true);
+        $data = $job->workload();
+        $json_data = json_decode($data, true);
         Log::info('gearmanWork:' . json_encode($json_data));
 
         $ozonService = new OzonService();
