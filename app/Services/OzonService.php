@@ -1010,11 +1010,28 @@ class OzonService
                 }
     
                 if (isset($product['price'])) {
-                    $priceResult = $this->setPrices([
-                        'product_id' => $ozonProductResult['result']['id'],
-                        'price' => strval($product['price']),
-                        'vat' => "0"
-                    ]);
+                    $oldPrice = 0;
+                    if (isset($ozonProductResult['result']['old_price'])) {
+                        $oldPrice = floatval($ozonProductResult['result']['old_price']);
+                    }
+                    $price = floatval($product['price']);
+                    if ($price < $oldPrice) {
+                        $priceData = [
+                            'product_id' => $ozonProductResult['result']['id'],
+                            'price' => strval($product['price']),
+                            'old_price' => strval($ozonProductResult['result']['old_price']),
+                            'vat' => "0"
+                        ];
+                    }
+                    else {
+                        $priceData = [
+                            'product_id' => $ozonProductResult['result']['id'],
+                            'price' => strval($product['price']),
+                            'vat' => "0"
+                        ];
+                    }
+
+                    $priceResult = $this->setPrices($priceData);
                     $updateFields['price'] = $product['price'];
                     $updateNeeded = true;
                 }
