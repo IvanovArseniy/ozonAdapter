@@ -1728,9 +1728,6 @@ class OzonService
                         'notified' => 0,
                         'order_id' => $order->ozon_order_id
                     ]);
-                    app('db')->connection('mysql')->table('orders')
-                        ->where('ozon_order_id', $order->ozon_order_id)
-                        ->update(['deleted' => 1]);
                 }
             }
         }
@@ -1856,6 +1853,11 @@ class OzonService
         $date = new \DateTime($order['order_time']);
         $date->modify('+3 hour');
         $date_approve_at = new \DateTime($order['order_time']);
+        $check_date = new \DateTime($order['order_time']);
+        $check_date->modify('+24 hour');
+        if ($check_date < new \DateTime('NOW')) {
+            $date_approve_at = new \DateTime('NOW');
+        }
         $date_approve_at->modify('+3 hour');
         $date_approve_at->add(new \DateInterval('P3D'));
         $status = $this->mapOrderStatus($order['status']);
@@ -1956,6 +1958,11 @@ class OzonService
                     'reason_code' => config('app.order_cancel_reason'),
                     'item_ids' => $items
                 ]);
+
+                app('db')->connection('mysql')->table('orders')
+                    ->where('ozon_order_id', $order['ozon_order_id'])
+                    ->update(['deleted' => 1]);
+
                 $response = json_decode($response, true);
                 Log::info($this->interactionId . ' => Cancel ozon order result: ' . json_encode($response));
             }

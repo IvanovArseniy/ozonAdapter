@@ -80,11 +80,20 @@ class DropshippService
                 }
             }
 
-            if ($success) {
+            app('db')->connection('mysql')->table('order_notification')
+                ->where('id', $notification->id)
+                ->update(['notified' => 1]);     
+
+            if (!$success) {
                 app('db')->connection('mysql')->table('order_notification')
-                    ->where('id', $notification->id)
-                    ->update(['notified' => 1]);        
+                    ->insert([
+                        'data' => null,
+                        'type' => $notification->type,
+                        'notified' => 0,
+                        'order_id' => $notification->ozonOrderId
+                    ]);        
             }
+
         }
 
         return $notificationResult;
