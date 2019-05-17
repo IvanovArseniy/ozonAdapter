@@ -476,7 +476,8 @@ class OzonService
             return false;
         }
         $ozonProductResult = $this->getProductInfo($product['product_id']);
-        $result = false;
+        $priceSuccess = false;
+        $quantitySuccess = false;
 
         if (isset($ozonProductResult['result'])) {
             $updateFields = [];
@@ -500,6 +501,9 @@ class OzonService
                 }
 
                 $priceResult = $this->setPrices($priceData);
+                if (isset($priceResult['result'])) {
+                    $priceSuccess = true;
+                }
             }
 
             if (isset($product['quantity'])) {
@@ -514,7 +518,7 @@ class OzonService
                 foreach ($quantityResults['result'] as $key => $quantityResult) {
                     if (isset($quantityResult['updated']) && boolval($quantityResult['updated'])) {
                         $this->enableProduct(boolval($ozonProductResult['result']['visibility_details']['active_product']), $quantityResult['product_id']);
-                        $result = true;
+                        $quantitySuccess = true;
                     }
                 }
             }
@@ -526,6 +530,19 @@ class OzonService
                     ->update($updateFields);
             }
         }
+
+        $data = ['product_id' => $product['product_id']];
+        if (!$quantitySuccess) {
+            $data['quantity'] = $product['quantity'];
+        }
+        if (!$priceSuccess) {
+            $data['price'] = $product['price'];
+        }
+
+        return [
+            'result' => $priceSuccess && $quantitySuccess,
+            'data' => $data
+        ];
 
         return $result;
     }

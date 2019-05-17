@@ -22,15 +22,22 @@ class GearmanService
         $ozonService = new OzonService();
         $sendStockResult = $ozonService->sendStockAndPriceForProduct($json_data);
 
-        if (!$sendStockResult) {
-            app('db')->connection('mysql')->table('gearman_retry_queue')
+        if (isset($sendStockResult['result']) && !$sendStockResult['result']) {
+            $try = 1;
+            if (isset($json_data['try'])) {
+                $try = $try + $json_data['try'];
+            }
+            $sendStockResult['data']['try'] = $try;
+            if ($try <= 1) {
+                app('db')->connection('mysql')->table('gearman_retry_queue')
                 ->insert(
                     [
                         'unique_key' => $job->unique(),
                         'function_name' => $job->functionName(),
-                        'data' => $job->workload(),
+                        'data' => json_encode($sendStockResult['data']),
                     ]
                 );
+            }
         }
     }
 
