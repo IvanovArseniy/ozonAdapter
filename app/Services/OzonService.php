@@ -1106,21 +1106,23 @@ class OzonService
 
     protected function saveProductVariant($product, $productId, $mallVariantId, $ozonProductId)
     {
-        $message = ['product_id' => $ozonProductId];
-        if (isset($product['quantity'])) {
-            $message['quantity'] = $product['quantity'];
-        }
-
-        if (isset($product['price'])) {
-            $message['price'] = $product['price'];
-        }
-
-        if (isset($product['quantity']) || isset($product['price'])) {
-            try {
-                GearmanService::add($message);
+        if (!is_null($ozonProductId)) {
+            $message = ['product_id' => $ozonProductId];
+            if (isset($product['quantity'])) {
+                $message['quantity'] = $product['quantity'];
             }
-            catch (\Exception $e) {
-                Log::error('Adding massage to gearman queue failed!');
+    
+            if (isset($product['price'])) {
+                $message['price'] = $product['price'];
+            }
+    
+            if (isset($product['quantity']) || isset($product['price'])) {
+                try {
+                    GearmanService::add($message);
+                }
+                catch (\Exception $e) {
+                    Log::error('Adding massage to gearman queue failed!');
+                }
             }
         }
     }
