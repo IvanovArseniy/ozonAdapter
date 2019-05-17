@@ -45,7 +45,7 @@ class GearmanService
                     $unique_key = $row->unique_key;
                     $function_name = $row->function_name;
                     $data = $row->data;
-                    GearmanService::add($row->data);
+                    GearmanService::add(json_decode($row->data));
 
                     app('db')->connection('mysql')->table('gearman_retry_queue')
                         ->where('unique_key', $unique_key)

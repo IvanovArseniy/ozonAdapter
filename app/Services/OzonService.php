@@ -471,8 +471,12 @@ class OzonService
 
     public function sendStockAndPriceForProduct($product)
     {
-        $result = false;
+        if(!is_array($product)) $product = json_decode($product,true);
+        if (!is_array($product)) {
+            return false;
+        }
         $ozonProductResult = $this->getProductInfo($product['product_id']);
+        $result = false;
 
         if (isset($ozonProductResult['result'])) {
             $updateFields = [];
