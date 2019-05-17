@@ -501,7 +501,7 @@ class OzonService
                 }
 
                 $priceResult = $this->setPrices($priceData);
-                if (isset($priceResult['result'])) {
+                if (isset($priceResult['result']) && isset($priceResult['result']['updated']) && $priceResult['result']['updated']) {
                     $priceSuccess = true;
                 }
             }
@@ -1092,9 +1092,9 @@ class OzonService
                         ];
                     }
 
-                    $priceResult = $this->setPrices($priceData);
-                    $updateFields['price'] = $product['price'];
-                    $updateNeeded = true;
+                    // $priceResult = $this->setPrices($priceData);
+                    // $updateFields['price'] = $product['price'];
+                    // $updateNeeded = true;
                 }
     
                 if (isset($product['enabled'])) {
