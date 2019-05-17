@@ -20,7 +20,7 @@ class GearmanService
         Log::info('gearmanWork:' . json_encode($json_data));
 
         $ozonService = new OzonService();
-        $sendStockResult = $ozonService->sendStockForProduct($json_data);
+        $sendStockResult = $ozonService->sendStockAndPriceForProduct($json_data);
 
         if (!$sendStockResult) {
             app('db')->connection('mysql')->table('gearman_retry_queue')

@@ -469,20 +469,60 @@ class OzonService
         }
     }
 
-    public function sendStockForProduct($stock)
+    public function sendStockAndPriceForProduct($product)
     {
         $result = false;
-        $ozonProductResult = $this->getProductInfo($stock['product_id']);
+        $ozonProductResult = $this->getProductInfo($product['product_id']);
 
         if (isset($ozonProductResult['result'])) {
-            $quantityResults = $this->setQuantity([$stock]);
-            foreach ($quantityResults['result'] as $key => $quantityResult) {
-                if (isset($quantityResult['updated']) && boolval($quantityResult['updated'])) {
-                    $this->enableProduct(boolval($ozonProductResult['result']['visibility_details']['active_product']), $quantityResult['product_id']);
-                    $result = true;
+            $updateFields = [];
+            $updateNeeded = false;
+
+            if (isset($product['price'])) {
+                $updateNeeded = true;
+                $updateFields['price'] = $product['price'];
+                $oldPrice = 0;
+                if (isset($ozonProductResult['result']['old_price'])) {
+                    $oldPrice = floatval($ozonProductResult['result']['old_price']);
+                }
+                $price = floatval($product['price']);
+                $priceData = [
+                    'product_id' => $ozonProductResult['result']['id'],
+                    'price' => strval($product['price']),
+                    'vat' => "0"
+                ];
+                if ($price < $oldPrice) {
+                    $priceData['old_price'] = strval($ozonProductResult['result']['old_price']);
+                }
+
+                $priceResult = $this->setPrices($priceData);
+            }
+
+            if (isset($product['quantity'])) {
+                $updateNeeded = true;
+                $updateFields['quantity'] = $product['quantity'];
+                $quantityResults = $this->setQuantity([
+                    [
+                        'product_id' => $product['product_id'],
+                        'stock' => $product['quantity']
+                    ]
+                ]);
+                foreach ($quantityResults['result'] as $key => $quantityResult) {
+                    if (isset($quantityResult['updated']) && boolval($quantityResult['updated'])) {
+                        $this->enableProduct(boolval($ozonProductResult['result']['visibility_details']['active_product']), $quantityResult['product_id']);
+                        $result = true;
+                    }
                 }
             }
+
+            if ($updateNeeded && count($updateFields) > 0) {
+                app('db')->connection('mysql')->table('product_variant')
+                    ->where('deleted', 0)
+                    ->where('ozon_product_id', $ozonProductResult['result']['id'])
+                    ->update($updateFields);
+            }
         }
+
         return $result;
     }
 
@@ -1066,25 +1106,23 @@ class OzonService
 
     protected function saveProductVariant($product, $productId, $mallVariantId, $ozonProductId)
     {
+        $message = ['product_id' => $ozonProductId];
         if (isset($product['quantity'])) {
+            $message['quantity'] = $product['quantity'];
+        }
+
+        if (isset($product['price'])) {
+            $message['price'] = $product['price'];
+        }
+
+        if (isset($product['quantity']) || isset($product['price'])) {
             try {
-                GearmanService::add([
-                    'product_id' => $ozonProductId,
-                    'stock' => $product['quantity']
-                ]);
+                GearmanService::add($message);
             }
             catch (\Exception $e) {
                 Log::error('Adding massage to gearman queue failed!');
             }
         }
-    }
-
-    public function scheduleActivation()
-    {
-        app('db')->connection('mysql')
-            ->select('
-                select щящт_зкщвгсе_шв
-            ');
     }
 
     protected function enableProduct($enabled, $id)
