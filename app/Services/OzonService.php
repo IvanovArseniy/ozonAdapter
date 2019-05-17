@@ -508,7 +508,7 @@ class OzonService
 
             if (isset($product['quantity'])) {
                 $updateNeeded = true;
-                $updateFields['quantity'] = $product['quantity'];
+                $updateFields['inventory'] = $product['quantity'];
                 $quantityResults = $this->setQuantity([
                     [
                         'product_id' => $product['product_id'],
