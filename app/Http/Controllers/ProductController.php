@@ -94,24 +94,6 @@ class ProductController extends BaseController
         return response()->json($response);
     }
 
-    public function setStock(OzonService $ozonService)
-    {
-        if (file_exists(storage_path() . '/app/setStock.lock')) {
-            return response()->json(['error' => 'setStock job already in work']);
-        }
-        file_put_contents(storage_path() . '/app/setStock.lock', 'Start');
-
-        $interactionId = $ozonService->getInteractionId();
-        Log::info($interactionId . ' => Send stocks started!');
-        //$result = $ozonService->sendStocks(0);
-        //$result = $ozonService->sendStocks(0);
-        Log::info($interactionId . ' => Send stocks ready!');
-
-        unlink(storage_path() . '/app/setStock.lock');
-
-        return response()->json($result);
-    }
-
     public function createProductCombination(OzonService $ozonService, Request $request, $productId)
     {
         $interactionId = $ozonService->getInteractionId();

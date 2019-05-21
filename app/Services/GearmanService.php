@@ -28,7 +28,7 @@ class GearmanService
                 $try = $try + $json_data['try'];
             }
             $sendStockResult['data']['try'] = $try;
-            if ($try <= 1) {
+            if ($try >= 0) {
                 app('db')->connection('mysql')->table('gearman_retry_queue')
                 ->insert(
                     [

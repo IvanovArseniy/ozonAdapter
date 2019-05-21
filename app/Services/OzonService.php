@@ -417,58 +417,6 @@ class OzonService
         ];
     }
 
-    public function sendStocks($offset)
-    {
-        $variants = app('db')->connection('mysql')->table('product_variant')
-            ->where('sent', 1)
-            ->where('deleted', 0)
-            ->whereNotNull('ozon_product_id')
-            ->orderBy('sent_date','asc')
-            ->skip($offset)
-            ->take(40)
-            ->get();
-
-        $productIds = [];
-        $stocks = [];
-        $productInfos = [];
-        $variantIds = [];
-        foreach ($variants as $key => $variant) {
-            array_push($variantIds, $variant->id);
-            $ozonProductResult = $this->getProductInfo($variant->ozon_product_id);
-            if (isset($ozonProductResult['result']) ?? strtolower($ozonProductResult['state']) == strtolower('processed')) {
-                $inventory = intval($variant->inventory) - 5;
-                $inventory = $inventory > 0 ? $inventory : 0;
-                array_push($stocks, [
-                    'product_id' => $variant->ozon_product_id,
-                    'stock' => $inventory
-                ]);
-                $productInfos[$variant->ozon_product_id] = boolval($ozonProductResult['result']['visibility_details']['active_product']);
-            }
-        }
-
-        if (count($stocks) > 0) {
-            $quantityResult = $this->setQuantity($stocks);
-            if (isset($quantityResult['result'])) {
-                foreach ($quantityResult['result'] as $key => $result) {
-                    if (isset($result['updated']) && boolval($result['updated'])) {
-                        array_push($productIds, $result['product_id']);
-                        if (isset($productInfos[$result['product_id']])) {
-                            $this->enableProduct($productInfos[$result['product_id']], $result['product_id']);
-                        }
-                    }
-                }
-            }
-
-            app('db')->connection('mysql')->table('product_variant')
-                ->whereIn('id', $variantIds)
-                ->update(['sent_date' => date('Y-m-d\TH:i:s.u')]);
-
-            app('db')->connection('mysql')->table('product_variant')
-                ->whereIn('ozon_product_id', $productIds)
-                ->update(['sent' => 2]);
-        }
-    }
-
     public function sendStockAndPriceForProduct($product)
     {
         if(!is_array($product)) $product = json_decode($product,true);
@@ -532,10 +480,10 @@ class OzonService
         }
 
         $data = ['product_id' => $product['product_id']];
-        if (!$quantitySuccess) {
+        if (!$quantitySuccess && isset($product['quantity'])) {
             $data['quantity'] = $product['quantity'];
         }
-        if (!$priceSuccess) {
+        if (!$priceSuccess && isset($product['price'])) {
             $data['price'] = $product['price'];
         }
 
@@ -1002,12 +950,10 @@ class OzonService
     protected function updateOzonProduct($product, $productId, $mallVariantId)
     {
         $productVariant = $this->getOzonProductId($productId, $mallVariantId);
-        if ($productVariant['Success']) {
-            $this->saveProductVariant($product, $productId, $mallVariantId, $productVariant['ozonProductId']);
-        }
         if ($productVariant['Success'] && !is_null($productVariant['ozonProductId'])) {
             $ozonProductResult = $this->getProductInfo($productVariant['ozonProductId']);
             if (isset($ozonProductResult['result'])) {
+                $this->saveProductVariant($product, $productId, $mallVariantId, $productVariant['ozonProductId']);
                 $ozonProductResult['result']['productVariant'] = [
                     'id' => $productVariant['id'],
                     'mallVariantId' => $productVariant['mallVariantId'],
