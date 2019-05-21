@@ -1735,6 +1735,10 @@ class OzonService
                         'notified' => 0,
                         'order_id' => $order->ozon_order_id
                     ]);
+
+                    app('db')->connection('mysql')->table('orders')
+                        ->where('ozon_order_id', $order->ozon_order_id)
+                        ->update(['deleted' => 1]);
                 }
             }
         }
