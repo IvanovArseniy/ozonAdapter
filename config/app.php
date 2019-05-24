@@ -58,7 +58,8 @@ return [
 
     'ozon_order_status' => [
         'AWAITING_APPROVE' => 'AWAITING_APPROVE',
-        'AWAITING_PACKAGING' => 'AWAITING_PACKAGING'
+        'AWAITING_PACKAGING' => 'AWAITING_PACKAGING',
+        'CANCELLED' => 'CANCELLED'
     ],
 
     'sync_portion' => 100,
