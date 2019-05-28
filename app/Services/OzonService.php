@@ -1667,9 +1667,7 @@ class OzonService
     public function getOrderList()
     {
         $data = [
-            'delivery_schema' => 'crossborder',
-            "page" => 1,
-            "page_size" => 2
+            'delivery_schema' => 'crossborder'
         ];
 
         Log::info($this->interactionId . ' => Get orders from ozon:' . json_encode($data, JSON_UNESCAPED_UNICODE));
