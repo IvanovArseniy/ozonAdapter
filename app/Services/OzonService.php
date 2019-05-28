@@ -1699,7 +1699,7 @@ class OzonService
                     ]);
                 if ($orderResult) {
                     array_push($notifyingOrderIds, $orderInfo['order_nr']);
-                    array_push($notifyingOrders, [
+                    $notifyingOrders = $this->pushOrderNotification($notifyingOrders, [
                         'data' => null,
                         'type' => 'create',
                         'notified' => 0,
@@ -1719,7 +1719,7 @@ class OzonService
                     if (isset($statusResult['response']) && !is_null($statusResult['response']) && !isset($statusResult['response']['error'])) {
                         //апрув в ozon'е прошёл. Надо заапрувить в DS
                         array_push($notifyingOrderIds, $orderInfo['order_nr']);
-                        array_push($notifyingOrders, [
+                        $notifyingOrders = $this->pushOrderNotification($notifyingOrders, [
                             'data' => null,
                             'type' => 'approve',
                             'notified' => 0,
@@ -1740,7 +1740,7 @@ class OzonService
                 if(!isset($toApprove[$order->ozon_order_id])){
                     //от ozon'а не пришёл - отменён
                     array_push($notifyingOrderIds, $order->ozon_order_nr);
-                    array_push($notifyingOrders, [
+                    $notifyingOrders = $this->pushOrderNotification($notifyingOrders, [
                         'data' => null,
                         'type' => 'decline',
                         'notified' => 0,
@@ -1758,6 +1758,20 @@ class OzonService
             ->insert($notifyingOrders);
 
         return $notifyingOrderIds;
+    }
+
+    public function pushOrderNotification($notifyingOrders, $notification)
+    {
+        $orderNotificationResult = app('db')->connection('mysql')->table('order_notification')
+            ->where('order_id', $notification['order_id'])
+            ->where('type', $notification['type'])
+            ->where('notified', $notification['notified'])
+            ->first();
+
+        if(!$orderNotificationResult) {
+            array_push($notifyingOrders, $notification);
+        }
+        return $notifyingOrders;
     }
 
     public function getOrderInfoCommon($orderNr)
