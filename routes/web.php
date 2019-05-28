@@ -52,6 +52,7 @@ $router->group(['prefix' => '1/orders', 'middleware' => 'auth'], function() use 
     $router->get('/{orderNr}', 'OrderController@getOrderInfo');
     $router->put('/{orderNr}', 'OrderController@setOrderStatus');
     $router->get('/', 'OrderController@getOrderList');
+    $router->get('/notify', 'OrderController@sendOrderNotifications');
 });
 
 $router->group(['prefix' => '1/categories', 'middleware' => 'auth'], function() use ($router) {
