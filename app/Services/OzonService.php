@@ -1680,11 +1680,16 @@ class OzonService
         $ozonOrders = $result['result'];
 
         $toApprove = [];//список пришедших заказов от ozon'а
+        $i = 0;
         foreach ($ozonOrders as $key => $ozonOrder) {
             $toApprove[$ozonOrder['order_id']] = true;
             $existedOrder = app('db')->connection('mysql')->table('orders')
                 ->where('ozon_order_id', $ozonOrder['order_id'])
                 ->first();
+
+            if ($i > 2) {
+                continue;
+            }
 
             $orderInfo = $this->getOzonOrderInfo($ozonOrder['order_id']);
             $orderInfo = $orderInfo['result'];
@@ -1728,6 +1733,8 @@ class OzonService
                     }
                 }
             }
+
+            $i++;
         }
 
         //Проверка на отмену

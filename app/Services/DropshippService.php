@@ -40,12 +40,16 @@ class DropshippService
                 where notified = 0 order by no.id asc limit 5');
 
         $notificationResult = [];
+        $created = 0;
+        $approved = 0;
+        $declined = 0;
         foreach ($notifications as $key => $notification) {
             $success = false;
             if ($notification->type == 'create') {
                 $result = $this->notifyNewOrder($notification->ozonOrderNr);
                 if (!isset($result['error'])) {
-                    array_push($notificationResult, $result);
+                    $created++;
+                    $notificationResult['created'] = $created;
                     $success = true;
                 }
             }
@@ -67,7 +71,8 @@ class DropshippService
             if ($notification->type == 'approve') {
                 $result = $this->ApproveOrder($notification->ozonOrderNr);
                 if (!isset($result['error'])) {
-                    array_push($notificationResult, $result);
+                    $approved++;
+                    $notificationResult['approved'] = $approved;
                     $success = true;
                 }
             }
@@ -75,7 +80,8 @@ class DropshippService
             if ($notification->type == 'decline') {
                 $result = $this->DeclineOrder($notification->ozonOrderNr);
                 if (!isset($result['error'])) {
-                    array_push($notificationResult, $result);
+                    $declined++;
+                    $notificationResult['declined'] = $declined;
                     $success = true;
                 }
             }
