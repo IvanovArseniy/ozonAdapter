@@ -43,6 +43,7 @@ $router->group(['prefix' => '1/tech', 'middleware' => 'auth'], function() use ($
     $router->get('/product/schedulejobs', 'ProductController@scheduleJobs');
     $router->get('/product/setstock', 'ProductController@setStock');
     $router->get('/order/setOrderNr', 'OrderController@setOrderNr');
+    $router->get('/order/notify', 'OrderController@sendOrderNotifications');
 
     $router->get('/product/gearman', 'ProductController@gearmanTry');
     $router->get('/queue/addForRetry', 'QueueController@addForRetry');
@@ -52,7 +53,6 @@ $router->group(['prefix' => '1/orders', 'middleware' => 'auth'], function() use 
     $router->get('/{orderNr}', 'OrderController@getOrderInfo');
     $router->put('/{orderNr}', 'OrderController@setOrderStatus');
     $router->get('/', 'OrderController@getOrderList');
-    $router->get('/notify', 'OrderController@sendOrderNotifications');
 });
 
 $router->group(['prefix' => '1/categories', 'middleware' => 'auth'], function() use ($router) {

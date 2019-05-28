@@ -37,7 +37,7 @@ class DropshippService
         $notifications = app('db')->connection('mysql')
             ->select('select no.id as id, no.type as type, no.data as data, o.ozon_order_id as ozonOrderId, o.ozon_order_nr as ozonOrderNr from order_notification no
                 left join orders o on o.ozon_order_id = no.order_id
-                where notified = 0 order by no.id asc limit 10');
+                where notified = 0 order by no.id asc limit 5');
 
         $notificationResult = [];
         foreach ($notifications as $key => $notification) {
