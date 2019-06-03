@@ -1247,7 +1247,7 @@ class OzonService
         if (!is_null($productVariants) && count($productVariants) > 0) {
             $imagesResult = $this->compareImages([
                 [
-                    'is_default' => false,
+                    'is_default' => true,
                     'imageUrl' => $image,
                     'deleted' => 0
                 ]],
