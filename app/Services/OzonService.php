@@ -1695,11 +1695,12 @@ class OzonService
                     ]);
                 if ($orderResult) {
                     array_push($notifyingOrderIds, $orderInfo['order_nr']);
-                    $notifyingOrders = $this->addOrderNotification($notifyingOrders, [
+                    $notifyingOrders = $this->processOrderNotification($notifyingOrders, [
                         'data' => null,
                         'type' => 'create',
                         'notified' => 0,
-                        'order_id' => $orderInfo['order_id']
+                        'order_id' => $orderInfo['order_id'],
+                        'order_nr' => $orderInfo['order_nr']
                     ]);
                 }
             } else {
@@ -1719,7 +1720,8 @@ class OzonService
                             'data' => null,
                             'type' => 'approve',
                             'notified' => 0,
-                            'order_id' => $orderInfo['order_id']
+                            'order_id' => $orderInfo['order_id'],
+                            'order_nr' => $orderInfo['order_nr']
                         ]);
                     }
                 }
@@ -1742,7 +1744,8 @@ class OzonService
                         'data' => null,
                         'type' => 'decline',
                         'notified' => 0,
-                        'order_id' => $order->ozon_order_id
+                        'order_id' => $order->ozon_order_id,
+                        'order_nr' => $order->ozon_order_nr
                     ]);
 
                     app('db')->connection('mysql')->table('orders')
@@ -1761,7 +1764,7 @@ class OzonService
     public function processOrderNotification($notifyingOrders, $notification)
     {
         try {
-            GearmanService::processOrderNotification($notification);
+            GearmanService::addOrderNotification($notification);
         }
         catch (\Exception $e) {
             Log::error('Adding order notification message to gearman queue failed!');
@@ -1774,7 +1777,12 @@ class OzonService
             ->first();
 
         if(!$orderNotificationResult) {
-            array_push($notifyingOrders, $notification);
+            array_push($notifyingOrders, [
+                'data' => $notification['data'],
+                'type' => $notification['type'],
+                'notified' => $notification['notified'],
+                'order_id' => $notification['order_id'],
+            ]);
         }
         return $notifyingOrders;
     }
