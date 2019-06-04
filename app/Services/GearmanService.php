@@ -28,7 +28,7 @@ class GearmanService
         $sendStockResult = $ozonService->sendStockAndPriceForProduct($json_data);
 
         if (isset($sendStockResult['result']) && !$sendStockResult['result']) {
-            GearmanService::processRetry($json_data, $sendStockResult);
+            GearmanService::processRetry($json_data, $sendStockResult, $job);
         }
     }
 
@@ -41,12 +41,12 @@ class GearmanService
         $dropshippService = new DropshippService();
         $orderNotifyResult = $dropshippService->notifyOrder($json_data);
 
-        if (!$orderNotifyResult) {
-            GearmanService::processRetry($json_data, $orderNotifyResult);
+        if (isset($orderNotifyResult['result']) && !$orderNotifyResult['result']) {
+            GearmanService::processRetry($json_data, $orderNotifyResult, $job);
         }
     }
 
-    public static function processRetry($json_data, $resultedData)
+    public static function processRetry($json_data, $resultedData, $job)
     {
         $try = 1;
         if (isset($json_data['try'])) {

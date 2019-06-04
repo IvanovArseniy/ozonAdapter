@@ -123,31 +123,31 @@ class DropshippService
 
         $success = false;
         if ($notification['type'] == 'create') {
-            $result = $this->notifyNewOrder($notification['ozonOrderNr']);
+            $result = $this->notifyNewOrder($notification['order_nr']);
             if (!isset($result['error'])) {
                 $success = true;
             }
         }
         elseif ($notification['type'] == 'update') {
-            $result = $this->notifyExistedOrder($notification['ozonOrderNr'], $notification['data']);
+            $result = $this->notifyExistedOrder($notification['order_nr'], $notification['data']);
             if (!isset($result['error'])) {
                 $success = true;
             }
         }
         elseif ($notification['type'] == 'delete') {
-            $result = $this->notifyDeletedOrder($notification['ozonOrderNr']);
+            $result = $this->notifyDeletedOrder($notification['order_nr']);
             if (!isset($result['error'])) {
                 $success = true;
             }
         }
         elseif ($notification['type'] == 'approve') {
-            $result = $this->ApproveOrder($notification['ozonOrderNr']);
+            $result = $this->ApproveOrder($notification['order_nr']);
             if (!isset($result['error'])) {
                 $success = true;
             }
         }
         elseif ($notification['type'] == 'decline') {
-            $result = $this->DeclineOrder($notification['ozonOrderNr']);
+            $result = $this->DeclineOrder($notification['order_nr']);
             if (!isset($result['error'])) {
                 $success = true;
             }
