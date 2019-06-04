@@ -219,7 +219,8 @@ class OzonService
                     'weight' => $product['weight'],
                     'default_category' => isset($product['categoryIds']) ? $product['categoryIds'][0] : null,
                     'mall_category_id' => $product['mallCategoryId'],
-                    'mall_category_name' => $product['mallCategoryName']
+                    'mall_category_name' => $product['mallCategoryName'],
+                    'brand' => isset($product['brand']) ? $product['brand'] : null,
                 ]); 
             if ($result) {
                 $productId = $pdo->lastInsertId();
@@ -308,6 +309,7 @@ class OzonService
                     p.default_category as defaultCategory,
                     p.mall_category_id as mallCategoryId,
                     p.mall_category_name as mallCategoryName,
+                    p.brand as brand,
                     i.image_url as imageUrl
                 from product_variant pv
                 left join product p on pv.product_id = p.id
@@ -337,6 +339,7 @@ class OzonService
                     p.default_category as defaultCategory,
                     p.mall_category_id as mallCategoryId,
                     p.mall_category_name as mallCategoryName, 
+                    p.brand as brand,
                     i.image_url as imageUrl
                     from product_variant pv
                     left join product p on pv.product_id = p.id
@@ -378,6 +381,7 @@ class OzonService
                             $categoryResult['categoryId'],
                             $variant->color,
                             $variant->size,
+                            $variant->brand,
                             $variant->imageUrl,
                             $productId
                         );
@@ -542,7 +546,7 @@ class OzonService
         return $result;
     }
 
-    protected function addProductToRequest($mallVariantId, $sku, $description, $name, $price, $weight, $quantity, $unlimited, $enabled, $ozonCategoryId, $color, $size, $mainImageUrl, $productId)
+    protected function addProductToRequest($mallVariantId, $sku, $description, $name, $price, $weight, $quantity, $unlimited, $enabled, $ozonCategoryId, $color, $size, $brand, $mainImageUrl, $productId)
     {
         if(!is_null($ozonCategoryId)) {
             $attributes = array([
@@ -564,7 +568,7 @@ class OzonService
                 }
             }
 
-            return [
+            $result =  [
                 'barcode' => strval($sku),
                 'description' => $description,
                 'category_id' => $ozonCategoryId,
@@ -586,23 +590,12 @@ class OzonService
                     'active_product' => $enabled
                 ]
             ];
-            //if ((is_null($color) || isset($colorAttribute['attributeId'])) && (is_null($size) || isset($sizeAttribute['attributeId']))) {
 
-            //}
-            // else {
-            //     $errorAttributes = array();
-            //     if (!is_null($color) && !isset($colorAttribute['attributeId'])) {
-            //         array_push($errorAttributes, 'Attribute color ' . $color . ' doesn\'t mapped correctly. Attribute map with ID=' . $colorAttribute['attributeMapId'] . ' was created.');
-            //     }
-            //     if (!is_null($size) && !isset($sizeAttribute['attributeId'])) {
-            //         array_push($errorAttributes, 'Attribute size= ' . $size . ' doesn\'t mapped correctly. Attribute map with ID=' . $sizeAttribute['attributeMapId'] . ' was created.');
-            //     }
+            if (!is_null($brand)) {
+                $result['vendor'] = $brand;
+            }
 
-            //     return [
-            //         'success' => false,
-            //         'error' => json_encode($errorAttributes)
-            //     ];
-            // }
+            return $result;
         }
         else return [
             'success' => false
