@@ -505,8 +505,6 @@ class OzonService
             'result' => $priceSuccess && $quantitySuccess,
             'data' => $data
         ];
-
-        return $result;
     }
 
     public function setOzonProductId()
@@ -1088,10 +1086,10 @@ class OzonService
     
             if (isset($product['quantity']) || isset($product['price'])) {
                 try {
-                    GearmanService::add($message);
+                    GearmanService::addPriceAndStock($message);
                 }
                 catch (\Exception $e) {
-                    Log::error('Adding massage to gearman queue failed!');
+                    Log::error('Adding message to gearman queue failed!');
                 }
             }
         }
@@ -1697,7 +1695,7 @@ class OzonService
                     ]);
                 if ($orderResult) {
                     array_push($notifyingOrderIds, $orderInfo['order_nr']);
-                    $notifyingOrders = $this->pushOrderNotification($notifyingOrders, [
+                    $notifyingOrders = $this->addOrderNotification($notifyingOrders, [
                         'data' => null,
                         'type' => 'create',
                         'notified' => 0,
@@ -1717,7 +1715,7 @@ class OzonService
                     if (isset($statusResult['response']) && !is_null($statusResult['response']) && !isset($statusResult['response']['error'])) {
                         //апрув в ozon'е прошёл. Надо заапрувить в DS
                         array_push($notifyingOrderIds, $orderInfo['order_nr']);
-                        $notifyingOrders = $this->pushOrderNotification($notifyingOrders, [
+                        $notifyingOrders = $this->processOrderNotification($notifyingOrders, [
                             'data' => null,
                             'type' => 'approve',
                             'notified' => 0,
@@ -1740,7 +1738,7 @@ class OzonService
                 if(!isset($toApprove[$order->ozon_order_id])){
                     //от ozon'а не пришёл - отменён
                     array_push($notifyingOrderIds, $order->ozon_order_nr);
-                    $notifyingOrders = $this->pushOrderNotification($notifyingOrders, [
+                    $notifyingOrders = $this->processOrderNotification($notifyingOrders, [
                         'data' => null,
                         'type' => 'decline',
                         'notified' => 0,
@@ -1760,8 +1758,15 @@ class OzonService
         return $notifyingOrderIds;
     }
 
-    public function pushOrderNotification($notifyingOrders, $notification)
+    public function processOrderNotification($notifyingOrders, $notification)
     {
+        try {
+            GearmanService::processOrderNotification($notification);
+        }
+        catch (\Exception $e) {
+            Log::error('Adding order notification message to gearman queue failed!');
+        }
+
         $orderNotificationResult = app('db')->connection('mysql')->table('order_notification')
             ->where('order_id', $notification['order_id'])
             ->where('type', $notification['type'])

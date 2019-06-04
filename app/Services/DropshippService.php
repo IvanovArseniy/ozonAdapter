@@ -111,6 +111,53 @@ class DropshippService
 
         return $notificationResult;
     }
+
+    public function notifyOrder($notification)
+    {
+        if (!is_array($notification)) {
+            $notification = json_decode($notification,true);
+        }
+        if (!is_array($notification)) {
+            return false;
+        }
+
+        $success = false;
+        if ($notification['type'] == 'create') {
+            $result = $this->notifyNewOrder($notification['ozonOrderNr']);
+            if (!isset($result['error'])) {
+                $success = true;
+            }
+        }
+        elseif ($notification['type'] == 'update') {
+            $result = $this->notifyExistedOrder($notification['ozonOrderNr'], $notification['data']);
+            if (!isset($result['error'])) {
+                $success = true;
+            }
+        }
+        elseif ($notification['type'] == 'delete') {
+            $result = $this->notifyDeletedOrder($notification['ozonOrderNr']);
+            if (!isset($result['error'])) {
+                $success = true;
+            }
+        }
+        elseif ($notification['type'] == 'approve') {
+            $result = $this->ApproveOrder($notification['ozonOrderNr']);
+            if (!isset($result['error'])) {
+                $success = true;
+            }
+        }
+        elseif ($notification['type'] == 'decline') {
+            $result = $this->DeclineOrder($notification['ozonOrderNr']);
+            if (!isset($result['error'])) {
+                $success = true;
+            }
+        }
+
+        return [
+            'result' => $success,
+            'data' => $notification
+        ];
+    }
     
     protected function notifyExistedOrder($orderNr, $data)
     {
