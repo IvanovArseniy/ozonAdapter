@@ -262,22 +262,40 @@ class OzonService
             $price = round((floatval($variant['priceRaw']) / 1.0815 * 1.035) + ($shippingPrice * 1.035), 2);
 
             try {
-                $pdo = app('db')->connection('mysql')->getPdo();
-                $result = app('db')->connection('mysql')->table('product_variant')
-                    ->insert([
-                        'product_id' => $productId,
-                        'mall_variant_id' => $variant['mallVariantId'],
-                        'color' => $variant['color'],
-                        'size' => $variant['size'],
-                        'price' => $price,
-                        'inventory' => $variant['inventory'],
-                        'deleted' => 0,
-                        'sent' => 0
-                    ]);
-    
-                if ($result) {
-                    $variantId = $pdo->lastInsertId();
-                    array_push($insertedVariants, $variantId);
+                $existedVariant = app('db')->connection('mysql')->table('product_variant')
+                    ->where('mall_variant_id', $variant['mallVariantId'])
+                    ->first();
+                if ($existedVariant) {
+                    app('db')->connection('mysql')->table('product_variant')
+                        ->where('mall_variant_id', $variant['mallVariantId'])
+                        ->update([
+                            'color' => $variant['color'],
+                            'size' => $variant['size'],
+                            'price' => $price,
+                            'inventory' => $variant['inventory'],
+                            'deleted' => 0
+                        ]);
+
+                    array_push($insertedVariants, $existedVariant->id);
+                }
+                else {
+                    $pdo = app('db')->connection('mysql')->getPdo();
+                    $result = app('db')->connection('mysql')->table('product_variant')
+                        ->insert([
+                            'product_id' => $productId,
+                            'mall_variant_id' => $variant['mallVariantId'],
+                            'color' => $variant['color'],
+                            'size' => $variant['size'],
+                            'price' => $price,
+                            'inventory' => $variant['inventory'],
+                            'deleted' => 0,
+                            'sent' => 0
+                        ]);
+        
+                    if ($result) {
+                        $variantId = $pdo->lastInsertId();
+                        array_push($insertedVariants, $variantId);
+                    }
                 }
             } catch (\Exception $e) {
                 
@@ -453,10 +471,6 @@ class OzonService
                 }
 
                 $priceResult = $this->setPrices($priceData);
-                Log::info("log1a" . json_encode(isset($priceResult['result'])));
-                Log::info("log2a" . json_encode(boolval($priceResult['result'][0]['updated'])));
-                Log::info("log3a" . json_encode(isset($priceResult['result']) && boolval($priceResult['result'][0]['updated'])));
-                Log::info("log4a" . json_encode($priceResult));
                 if (isset($priceResult['result']) && boolval($priceResult['result'][0]['updated'])) {
                     $priceSuccess = true;
                 }
@@ -1192,7 +1206,7 @@ class OzonService
     {
         $imagesResult = [];
         $productVariants = $this->getProductVariants($productId);
-        if (!is_null($productVariants)) {
+        if (!is_null($productVariants) && count($productVariants) > 0) {
             foreach ($productVariants as $key => $variant) {
                 $imagesResult = $this->compareImages([
                     [
