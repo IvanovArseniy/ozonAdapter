@@ -53,9 +53,9 @@ class ProductController extends BaseController
         Log::info($interactionId . ' => Send products and get IDs.');
         $sendResult = $ozonService->scheduleProductCreation();
         $sendResult = $ozonService->scheduleProductCreation();
-        $idsResult = $ozonService->setOzonProductId();
+        //$idsResult = $ozonService->setOzonProductId();
         Log::info($interactionId . ' => Send products result:' . json_encode($sendResult));
-        Log::info($interactionId . ' => Get ids result:' . json_encode($idsResult));
+        //Log::info($interactionId . ' => Get ids result:' . json_encode($idsResult));
         Log::info($interactionId . ' => Send products and get IDs ready!');
 
         unlink(storage_path() . '/app/scheduleJobs.lock');
@@ -79,17 +79,17 @@ class ProductController extends BaseController
 
     public function setProductExternalId(OzonService $ozonService)
     {
-        if (file_exists(storage_path() . '/app/setProductExternalId.lock')) {
-            return response()->json(['error' => 'setProductExternalId job already in work']);
-        }
-        file_put_contents(storage_path() . '/app/setProductExternalId.lock', 'Start');
+        // if (file_exists(storage_path() . '/app/setProductExternalId.lock')) {
+        //     return response()->json(['error' => 'setProductExternalId job already in work']);
+        // }
+        // file_put_contents(storage_path() . '/app/setProductExternalId.lock', 'Start');
 
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Set product external Ids started');
         $response = $ozonService->setOzonProductId();
         Log::info($interactionId . ' => Set product external Ids finished');
 
-        unlink(storage_path() . '/app/setProductExternalId.lock');
+        // unlink(storage_path() . '/app/setProductExternalId.lock');
 
         return response()->json($response);
     }

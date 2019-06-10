@@ -18,6 +18,12 @@ class GearmanService
         $client->doBackground('processOrderNotification', json_encode($data));
     }
 
+    public static function addSetOzonIds($data) {
+        $client = new \GearmanClient();
+        $client->addServers('localhost');
+        $client->doBackground('setOzonIds', json_encode($data));
+    }
+
     public static function processStockAndPrice(\GearmanJob $job)
     {
         $data = $job->workload();
@@ -44,6 +50,14 @@ class GearmanService
         if (isset($orderNotifyResult['result']) && !$orderNotifyResult['result']) {
             GearmanService::processRetry($json_data, $orderNotifyResult, $job);
         }
+    }
+
+    public static function setOzonIds(\GearmanJob $job)
+    {
+        $data = $job->workload();
+        $json_data = json_decode($data, true);
+        $ozonService = new OzonService();
+        $ozonService->setOzonProductId();
     }
 
     public static function processRetry($json_data, $resultedData, $job)
@@ -76,7 +90,12 @@ class GearmanService
                     $unique_key = $row->unique_key;
                     $function_name = $row->function_name;
                     $data = $row->data;
-                    GearmanService::add(json_decode($row->data));
+                    if ($function_name == 'processStockAndPrice') {
+                        GearmanService::addPriceAndStock(json_decode($row->data));
+                    }
+                    elseif ($function_name == 'processOrderNotification') {
+                        GearmanService::addOrderNotification(json_decode($row->data));
+                    }
 
                     app('db')->connection('mysql')->table('gearman_retry_queue')
                         ->where('unique_key', $unique_key)

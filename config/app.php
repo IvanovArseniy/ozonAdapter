@@ -56,6 +56,18 @@ return [
         'DELIVERED' => 'READY_FOR_PICKUP'
     ],
 
+    'order_item_status' => [
+        'ST_NONE' => 0,
+        'ST_NEW' => 1,
+        'ST_PAYMENT_APPROVED' => 2,
+        'ST_PAYMENT_CANCELLED' => 3,
+        'ST_FULFILLING' => 4,
+        'ST_SHIPPED' => 5,
+        'ST_DECLINED' => 6,
+        'ST_DELIVERED' => 7,
+        'ST_REFUNDED' => 8
+    ],
+
     'ozon_order_status' => [
         'AWAITING_APPROVE' => 'AWAITING_APPROVE',
         'AWAITING_PACKAGING' => 'AWAITING_PACKAGING',
