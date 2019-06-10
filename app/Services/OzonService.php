@@ -428,15 +428,15 @@ class OzonService
                 }
             }
 
-            $result = $this->sendProductsToOzon($items);
-            if (isset($result['result']) && isset($result['result']['task_id'])) {
-                app('db')->connection('mysql')->table('product_variant')
-                    ->whereIn('id', $variantIds)
-                    ->update(['sent' => 1, 'sent_date' => date('Y-m-d\TH:i:s.u')]);
-            }
-            app('db')->connection('mysql')->table('product_variant')
-                ->whereIn('id', $setSentDateIds)
-                ->update(['sent_date' => date('Y-m-d\TH:i:s.u')]);
+            //$result = $this->sendProductsToOzon($items);
+            // if (isset($result['result']) && isset($result['result']['task_id'])) {
+            //     app('db')->connection('mysql')->table('product_variant')
+            //         ->whereIn('id', $variantIds)
+            //         ->update(['sent' => 1, 'sent_date' => date('Y-m-d\TH:i:s.u')]);
+            // }
+            // app('db')->connection('mysql')->table('product_variant')
+            //     ->whereIn('id', $setSentDateIds)
+            //     ->update(['sent_date' => date('Y-m-d\TH:i:s.u')]);
         }
 
         
@@ -936,11 +936,11 @@ class OzonService
                     left join image i on i.id = pvi.image_id where pv.product_id = ' . $productId . '
                     and i.is_default = 1 and i.deleted = 0 limit 1');
 
-            Log::info(json_encode($imageUrl, JSON_UNESCAPED_UNICODE));
-            if ($imageUrl) {
-                Log::info(json_encode($imageUrl[0]->imageUrl, JSON_UNESCAPED_UNICODE));
-                $this->addMainImage($productId, $imageUrl[0]->imageUrl);
-            }
+            // Log::info(json_encode($imageUrl, JSON_UNESCAPED_UNICODE));
+            // if ($imageUrl) {
+            //     Log::info(json_encode($imageUrl[0]->imageUrl, JSON_UNESCAPED_UNICODE));
+            //     $this->addMainImage($productId, $imageUrl[0]->imageUrl);
+            // }
 
         }
         
