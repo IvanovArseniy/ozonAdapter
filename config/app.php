@@ -58,14 +58,14 @@ return [
 
     'order_item_status' => [
         'ST_NONE' => 0,
-        'ST_NEW' => 1,
-        'ST_PAYMENT_APPROVED' => 2,
-        'ST_PAYMENT_CANCELLED' => 3,
-        'ST_FULFILLING' => 4,
-        'ST_SHIPPED' => 5,
-        'ST_DECLINED' => 6,
-        'ST_DELIVERED' => 7,
-        'ST_REFUNDED' => 8
+        'ST_NEW' => 'new',
+        'ST_PAYMENT_APPROVED' => 'approved',
+        'ST_PAYMENT_CANCELLED' => 'fulfiling',
+        'ST_FULFILLING' => 'shipped',
+        'ST_SHIPPED' => 'delivered',
+        'ST_DECLINED' => 'cancelled',
+        'ST_DELIVERED' => 'declined',
+        'ST_REFUNDED' => 'refunded'
     ],
 
     'ozon_order_status' => [

@@ -19,7 +19,7 @@ class OrderController extends BaseController
         return response()->json($result);
     }
 
-    public function setOrderStatus(OzonService $ozonService, Request $request, $orderNr)
+    public function setOrderStatus1(OzonService $ozonService, Request $request, $orderNr)
     {
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Set order status:'. $orderNr);
@@ -34,7 +34,7 @@ class OrderController extends BaseController
         return response()->json($result);
     }
 
-    public function setOrderStatus1(OzonService $ozonService, Request $request, $orderNr)
+    public function setOrderStatus(OzonService $ozonService, Request $request, $orderNr)
     {
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Set order status:'. $orderNr);

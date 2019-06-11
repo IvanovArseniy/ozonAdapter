@@ -545,6 +545,16 @@ class OzonService
                 $updateFields = [];
                 if(isset($ozonProduct['result'])) {
                     $updateFields = ['ozon_product_id' => $ozonProduct['result']['id']];
+                    $message = ['product_id' => $ozonProduct['result']['id']];
+                    $message['quantity'] = $variant->inventory;
+                    $message['price'] = $variant->price;
+            
+                    try {
+                        GearmanService::addPriceAndStock($message);
+                    }
+                    catch (\Exception $e) {
+                        Log::error('Adding message to gearman queue failed!');
+                    }
                 }
                 else {
                     $errors[$variant->product_id] = 'Product with id=' . $variant->product_id . ' not created yet in ozon';
@@ -1114,7 +1124,7 @@ class OzonService
                 $message['price'] = $product['price'];
             }
     
-            if (isset($product['quantity']) || isset($product['price'])) {
+            if (isset($message['quantity']) || isset($message['price'])) {
                 try {
                     GearmanService::addPriceAndStock($message);
                 }
@@ -2037,7 +2047,7 @@ class OzonService
                     || $orderItem['status'] == config('app.order_item_status.ST_REFUNDED')) {
                         array_push($toCancel, $item['item_id']);
                     }
-                    elseif ($orderItem['status'] == config('app.order_item_status.ST_SHIPPED')) {
+                    elseif ($orderItem['status'] == config('app.order_item_status.ST_SHIPPED') || $orderItem['status'] == config('app.order_item_status.ST_DELIVERED')) {
                         if (isset($orderItem['quantity']) && !is_null($orderItem['quantity'])
                         && isset($orderItem['trackingNumber']) && !is_null($orderItem['trackingNumber'])) {
                             array_push($toShipped, [
@@ -2085,7 +2095,7 @@ class OzonService
                 $response = json_decode($response, true);
                 Log::info($this->interactionId . ' => Cancel ozon order result: ' . json_encode($response, JSON_UNESCAPED_UNICODE));
             }
-            if (strtoupper($status) == strtoupper(config('app.order_ship_status'))) {
+            if (strtoupper($status) == strtoupper(config('app.order_ship_status')) || strtoupper($status) == strtoupper(config('app.order_delivered_status'))) {
                 foreach ($toShipped as $key => $orderItemShipped) {
                     Log::info($this->interactionId . ' =>Ship ozon order:' . strval($order['ozon_order_id']));
                     $response = $this->sendData($this->shipOrderUrl, [
