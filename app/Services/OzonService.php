@@ -261,6 +261,14 @@ class OzonService
             }
             $price = round((floatval($variant['priceRaw']) / 1.0815 * 1.035) + ($shippingPrice * 1.035), 2);
 
+            $quantity = 0;
+            if (isset($variant['isPromo']) && boolval($variant['isPromo'])) {
+                $quantity = $variant['inventory'];
+            }
+            else {
+                $quantity = $variant['inventory'] - 5 > 0 ? $variant['inventory'] - 5 : 0;
+            }
+
             try {
                 $existedVariant = app('db')->connection('mysql')->table('product_variant')
                     ->where('mall_variant_id', $variant['mallVariantId'])
@@ -272,7 +280,7 @@ class OzonService
                             'color' => $variant['color'],
                             'size' => $variant['size'],
                             'price' => $price,
-                            'inventory' => $variant['inventory'],
+                            'inventory' => $quantity,
                             'deleted' => 0,
                             'ozon_product_id' => null,
                             'sent' => 0
@@ -919,7 +927,12 @@ class OzonService
                 }
 
                 if (isset($variant['inventory']) && !is_null($variant['inventory'])) {
-                    $item['quantity'] = $variant['inventory'];
+                    if (isset($variant['isPromo']) && boolval($variant['isPromo'])) {
+                        $item['quantity'] = $variant['inventory'];
+                    }
+                    else {
+                        $item['quantity'] = $variant['inventory'] - 5 > 0 ? $variant['inventory'] - 5 : 0;
+                    }
                 }
 
                 if (isset($product['enabled'])) {
