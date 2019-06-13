@@ -557,12 +557,7 @@ class OzonService
                     $message['quantity'] = $variant->inventory;
                     $message['price'] = $variant->price;
             
-                    try {
-                        GearmanService::addPriceAndStock($message);
-                    }
-                    catch (\Exception $e) {
-                        Log::error('Adding message to gearman queue failed!');
-                    }
+                    $sendStockResult = $ozonService->sendStockAndPriceForProduct($message);
                 }
                 else {
                     $errors[$variant->product_id] = 'Product with id=' . $variant->product_id . ' not created yet in ozon';
@@ -1731,17 +1726,16 @@ class OzonService
                 ->where('ozon_order_id', $ozonOrder['order_id'])
                 ->first();
 
-            if ($i > 2) {
-                continue;
-            }
-
-            $orderInfo = $this->getOzonOrderInfo($ozonOrder['order_id']);
-            $orderInfo = $orderInfo['result'];
             if (!$existedOrder) {
+                if ($i > 4) {
+                    continue;
+                }
+                $orderInfo = $this->getOzonOrderInfo($ozonOrder['order_id']);
+                $orderInfo = $orderInfo['result'];
                 $orderResult = app('db')->connection('mysql')->table('orders')
                     ->insert([
                         'ozon_order_id' => $orderInfo['order_id'],
-                        'create_date' => date('Y-m-d\TH:i:s.u'),
+                        'create_date' => $orderInfo['order_time'],
                         'status' => $orderInfo['status'],
                         'deleted' => 0,
                         'ozon_order_nr' => $orderInfo['order_nr']
@@ -1756,9 +1750,10 @@ class OzonService
                         'order_nr' => $orderInfo['order_nr']
                     ]);
                 }
+                $i++;
             } else {
                 //Заказ уже есть, проверяем не вышло ли 4 часа для отмены
-                $dt = new \DateTime($orderInfo['order_time']);
+                $dt = new \DateTime($existedOrder->create_date);
                 $dt->modify('+3 hour');
                 $dt->add(new \DateInterval('PT4H'));
                 $dtnow = new \DateTime();
@@ -1768,19 +1763,17 @@ class OzonService
                     $statusResult = $this->setOrderStatus($ozonOrder['order_id'], config('app.order_approve_status'), null, null);
                     if (isset($statusResult['response']) && !is_null($statusResult['response']) && !isset($statusResult['response']['error'])) {
                         //апрув в ozon'е прошёл. Надо заапрувить в DS
-                        array_push($notifyingOrderIds, $orderInfo['order_nr']);
+                        array_push($notifyingOrderIds, $existedOrder->ozon_order_nr);
                         $notifyingOrders = $this->processOrderNotification($notifyingOrders, [
                             'data' => null,
                             'type' => 'approve',
                             'notified' => 0,
-                            'order_id' => $orderInfo['order_id'],
-                            'order_nr' => $orderInfo['order_nr']
+                            'order_id' => $existedOrder->ozon_order_id,
+                            'order_nr' => $existedOrder->ozon_order_nr
                         ]);
                     }
                 }
             }
-
-            $i++;
         }
 
         //Проверка на отмену
@@ -2101,9 +2094,11 @@ class OzonService
                     'item_ids' => $toCancel
                 ]);
 
-                app('db')->connection('mysql')->table('orders')
-                    ->where('ozon_order_id', $order['ozon_order_id'])
-                    ->update(['status' => config('app.ozon_order_status.CANCELLED')]);
+                if (strtoupper($status) == strtoupper(config('app.order_cancel_status'))) {
+                    app('db')->connection('mysql')->table('orders')
+                        ->where('ozon_order_id', $order['ozon_order_id'])
+                        ->update(['status' => config('app.ozon_order_status.CANCELLED')]);
+                }
 
                 $response = json_decode($response, true);
                 Log::info($this->interactionId . ' => Cancel ozon order result: ' . json_encode($response, JSON_UNESCAPED_UNICODE));
