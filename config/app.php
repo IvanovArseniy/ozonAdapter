@@ -75,5 +75,7 @@ return [
     ],
 
     'sync_portion' => 100,
-    'shipping_rf_code' => 'eecb1edb-d647-479f-aa6e-a2e3c5f16be4'
+    'shipping_rf_code' => 'eecb1edb-d647-479f-aa6e-a2e3c5f16be4',
+
+    'enable_product_creation' => false
 ];

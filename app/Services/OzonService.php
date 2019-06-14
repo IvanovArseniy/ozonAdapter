@@ -385,9 +385,14 @@ class OzonService
                         $variant->imageUrl,
                         $productId
                     );
-                    $result = $this->sendProductsToOzon([$item]);
 
-                    if (isset($result['result']) && isset($result['result']['task_id'])) {
+
+                    $result = null;
+                    if (config('app.ozon_product_group_attribute')) {
+                        $result = $this->sendProductsToOzon([$item]);
+                    }
+
+                    if (!config('app.ozon_product_group_attribute') || (!is_null($result) && isset($result['result']) && isset($result['result']['task_id']))) {
                         try {
                             GearmanService::addSetOzonProductIdNotification(['mall_variant_id' => $variant->mallVariantId]);
                         }
