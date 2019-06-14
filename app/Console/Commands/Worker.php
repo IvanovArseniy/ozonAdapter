@@ -14,9 +14,11 @@ class Worker extends Command
         $worker = new \GearmanWorker();
         $worker->addServer('localhost');
 
-        $worker->addFunction('processStockAndPrice', '\App\Services\GearmanService::processStockAndPrice');
         $worker->addFunction('processOrderNotification', '\App\Services\GearmanService::processOrderNotification');
         $worker->addFunction('setOzonIds', '\App\Services\GearmanService::setOzonIds');
+        $worker->addFunction('processProductToOzon', '\App\Services\GearmanService::processProductToOzon');
+        $worker->addFunction('setOzonProductId', '\App\Services\GearmanService::setOzonProductId');
+        $worker->addFunction('processStockAndPrice', '\App\Services\GearmanService::processStockAndPrice');
 
         while (1) {
             $worker->work();
