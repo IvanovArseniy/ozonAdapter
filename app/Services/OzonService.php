@@ -160,6 +160,7 @@ class OzonService
 
         Log::info($this->interactionId . ' => Get product info from ozon:' . json_encode(['product_id' => $ozonProductId], JSON_UNESCAPED_UNICODE));
         $response = $this->sendData($this->productInfoUrl, ['product_id' => $ozonProductId]);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Ozon products: ' . $response);
         return $response;
     }
@@ -168,6 +169,7 @@ class OzonService
     {
         Log::info($this->interactionId . ' => Get product info from ozon by sku:' . json_encode(['offer_id' => $offerId], JSON_UNESCAPED_UNICODE));
         $response = $this->sendData($this->productInfoUrl, ['offer_id' => $offerId]);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Ozon products: ' . $response);
         return $response;
     }
@@ -542,6 +544,7 @@ class OzonService
         try {
             $variants = app('db')->connection('mysql')->table('product_variant')
             ->whereNull('ozon_product_id')
+            ->where('deleted', 0)
             ->orderBy('sent_date','asc')
             ->take(20)
             ->get();
@@ -556,16 +559,20 @@ class OzonService
                     $message = ['product_id' => $ozonProduct['result']['id']];
                     $message['quantity'] = $variant->inventory;
                     $message['price'] = $variant->price;
+
+                    app('db')->connection('mysql')->table('product_variant')
+                    ->where('id', $variant->id)
+                    ->update($updateFields);
             
-                    $sendStockResult = $ozonService->sendStockAndPriceForProduct($message);
+                    $sendStockResult = $this->sendStockAndPriceForProduct($message);
                 }
                 else {
                     $errors[$variant->product_id] = 'Product with id=' . $variant->product_id . ' not created yet in ozon';
                     $updateFields = ['sent_date' => date('Y-m-d\TH:i:s.u')];
-                }
-                app('db')->connection('mysql')->table('product_variant')
+                    app('db')->connection('mysql')->table('product_variant')
                     ->where('id', $variant->id)
                     ->update($updateFields);
+                }
             }
         }
         catch (\Exception $e) {
@@ -584,6 +591,7 @@ class OzonService
     protected function sendProductsToOzon($items) {
         Log::info($this->interactionId . ' => Import product request to ozon:' . json_encode(['items' => $items], JSON_UNESCAPED_UNICODE));
         $response = $this->sendData($this->importProductsUrl, ['items' => $items]);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Import ozon products: ' . $response);
         $result = json_decode($response, true);
         return $result;
@@ -755,6 +763,7 @@ class OzonService
     {
         Log::info($this->interactionId . ' => Update stocks request to ozon:' . json_encode(['stocks' => $items], JSON_UNESCAPED_UNICODE));
         $response = $this->sendData($this->updateStocksUrl, ['stocks' => $items]);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Update stocks response: ' . $response);
         $result = json_decode($response, true);
         return $result;
@@ -1061,6 +1070,7 @@ class OzonService
                 if ($updateNeeded) {
                     Log::info($this->interactionId . ' => Update product request to ozon:' . json_encode($request, JSON_UNESCAPED_UNICODE));
                     $response = $this->sendData($this->updateProductUrl, $request);
+                    $response = $response['response'];
                     Log::info($this->interactionId . ' => Update product response: ' . $response);
                     $result = json_decode($response, true);
                 }
@@ -1159,6 +1169,7 @@ class OzonService
     {
         Log::info($this->interactionId . ' => Update prices request to ozon:' . json_encode(['prices' => [$items]], JSON_UNESCAPED_UNICODE));
         $response = $this->sendData($this->updatePricesUrl, ['prices' => [$items]]);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Update prices response: ' . $response);
         $result = json_decode($response, true);
         return $result;
@@ -1181,6 +1192,7 @@ class OzonService
     {
         Log::info($this->interactionId . ' => Activate ozon product: ' . $ozonProductId);
         $response = $this->sendData($this->activateProductUrl, ['product_id' => $ozonProductId]);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Activate ozon product result: ' . $response);
         return $response;
     }
@@ -1189,6 +1201,7 @@ class OzonService
     {
         Log::info($this->interactionId . ' => Deactivate ozon product: ' . $ozonProductId);
         $response = $this->sendData($this->deactivateProductUrl, ['product_id' => $ozonProductId]);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Deactivate ozon product result: ' . $response);
         return $response;
     }
@@ -1491,6 +1504,7 @@ class OzonService
         ];
         Log::info($this->interactionId . ' => Get products from ozon:' . $data);
         $response = $this->sendData($this->productListUrl, $data);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Ozon products info: ' . $response);
         $result = json_decode($response, true);
         return $result;
@@ -1711,6 +1725,7 @@ class OzonService
 
         Log::info($this->interactionId . ' => Get orders from ozon:' . json_encode($data, JSON_UNESCAPED_UNICODE));
         $response = $this->sendData($this->orderListUrl, $data);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Ozon order info: ' . $response);
         $result = json_decode($response, true);
 
@@ -1884,6 +1899,7 @@ class OzonService
     {
         Log::info($this->interactionId . ' => Get order info from ozon: ' . $ozonOrderId);
         $response = $this->sendData(str_replace('{orderId}', $ozonOrderId, $this->orderInfoUrl), null);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Ozon order info: ' . $response);
         $order = json_decode($response, true);
 
@@ -2069,6 +2085,8 @@ class OzonService
                     }
                 }
             }
+
+            $httpCode = null;
             // if(strtoupper($status) == strtoupper(config('app.order_approve_status')))
             // {
             //     Log::info($this->interactionId . ' => Approve ozon order:' . strval($order['ozon_order_id']));
@@ -2076,6 +2094,8 @@ class OzonService
             //         'order_id' => $order['ozon_order_id'],
             //         'item_ids' => $toApprove
             //     ]);
+                    // $httpCode = $response['http_code'];
+                    // $response = $response['response'];
             //     $response = json_decode($response, true);
             //     app('db')->connection('mysql')->table('orders')
             //         ->where('ozon_order_id', $order['ozon_order_id'])
@@ -2093,6 +2113,8 @@ class OzonService
                     'reason_code' => config('app.order_cancel_reason'),
                     'item_ids' => $toCancel
                 ]);
+                $httpCode = $response['http_code'];
+                $response = $response['response'];
 
                 if (strtoupper($status) == strtoupper(config('app.order_cancel_status'))) {
                     app('db')->connection('mysql')->table('orders')
@@ -2115,6 +2137,8 @@ class OzonService
                             'quantity' => $orderItemShipped['quantity']
                         ]]
                     ]);
+                    $httpCode = $response['http_code'];
+                    $response = $response['response'];
                     $response = json_decode($response, true);
                     Log::info($this->interactionId . ' => Ship ozon order result: ' . json_encode($response, JSON_UNESCAPED_UNICODE));
                 }
@@ -2125,14 +2149,17 @@ class OzonService
             return [
                 'order_id' => $orderNr,
                 'fulfillmentStatus' => $status,
-                'response' => $response
+                'response' => $response,
+                'success' => !isset($response['error']),
+                'http_code' => $httpCode
             ];
         }
         else {
             return [
                 'order_id' => $orderNr,
                 'fulfillmentStatus' => $status,
-                'response' => 'null'
+                'response' => 'null',
+                'http_code' => $httpCode
             ];
         }
     }
@@ -2157,6 +2184,7 @@ class OzonService
                     'order_id' => $order['ozon_order_id'],
                     'item_ids' => $items
                 ]);
+                $response = $response['response'];
                 $response = json_decode($response, true);
                 app('db')->connection('mysql')->table('orders')
                     ->where('ozon_order_id', $order['ozon_order_id'])
@@ -2171,6 +2199,7 @@ class OzonService
                     'reason_code' => config('app.order_cancel_reason'),
                     'item_ids' => $items
                 ]);
+                $response = $response['response'];
 
                 app('db')->connection('mysql')->table('orders')
                     ->where('ozon_order_id', $order['ozon_order_id'])
@@ -2202,6 +2231,7 @@ class OzonService
                                 'quantity' => $quantity
                             ]]
                         ]);
+                        $response = $response['response'];
                         $response = json_decode($response, true);
                         Log::info($this->interactionId . ' => Ship ozon order result: ' . json_encode($response, JSON_UNESCAPED_UNICODE));
                     }
@@ -2284,6 +2314,7 @@ class OzonService
     public function insertCategories()
     {
         $response = $this->sendData($this->categoryListUrl, null);
+        $response = $response['response'];
         $result = json_decode($response, true);
         $this->insertChildCategories($result['result'], '');
     }
@@ -2304,6 +2335,7 @@ class OzonService
                 }
                 if ($categoryResult) {
                     $response = $this->sendData(str_replace('{category_id}', $category['category_id'], $this->categoryAttributeListUrl), null);
+                    $response = $response['response'];
                     $result = json_decode($response, true);
                     foreach ($result['result'] as $key => $attribute) {
                         if(!in_array($attribute['id'], $this->attributes)) {
@@ -2390,7 +2422,11 @@ class OzonService
         Log::info($this->interactionId . ' => Url: ' . $this->baseUrl . $url);
         Log::info($this->interactionId . ' => Data: ' . json_encode($data, JSON_UNESCAPED_UNICODE));
         $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        return $response;
+        return [
+            'http_code' => $http_code,
+            'response' => $response
+        ];
     }
 }

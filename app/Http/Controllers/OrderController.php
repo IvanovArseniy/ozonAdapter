@@ -46,7 +46,15 @@ class OrderController extends BaseController
             isset($statusInfo['trackingNumber']) ? $statusInfo['trackingNumber'] : null,
             isset($statusInfo['items']) ? $statusInfo['items'] : null);
         Log::info($interactionId . ' => Set order status result:'. json_encode($result));
-        return response()->json($result);
+        if (!is_null($result) && isset($result['http_code']) && inval($result['http_code']) == 200) {
+            return response()->json($result);
+        }
+        elseif (!is_null($result) && isset($result['http_code']) && inval($result['http_code']) != 200) {
+            return response()->json($result, $result['http_code']);
+        }
+        else {
+            return response()->json($result, 500);
+        }
     }
 
     public function getOrderList(OzonService $ozonService, DropshippService $dropshippService)
