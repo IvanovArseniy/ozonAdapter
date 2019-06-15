@@ -1318,6 +1318,7 @@ class OzonService
         if (!is_null($productVariants)) {
             foreach ($productVariants as $key => $variant) {
                 $ozonProductInfo = $this->getProductInfo($variant->ozon_product_id);
+                $ozonProductInfo = $this->getProductInfo($variant->ozonProductId);
                 if (isset($ozonProductInfo['result'])) {
                     $imageResult = $this->getImages($ozonProductInfo['result']['images'], $variant->id);
                     $images = array();
