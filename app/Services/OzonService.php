@@ -1889,7 +1889,7 @@ class OzonService
         }
         $order =  $this->getOzonOrderInfo($orderResult->ozon_order_id);
 
-        if (!is_null($order)) {
+        if (!isset($order['error']) && !isset($order['errorCode'])) {
             return $this->mapOrder($order['result']);
         }
         return $order;
@@ -1955,7 +1955,7 @@ class OzonService
             return $order;
         }
         else {
-            return null;
+            return $order;
         }
     }
 
@@ -2041,9 +2041,10 @@ class OzonService
         $toApprove = [];
         $toCancel = [];
         $toShipped = [];
+        $httpCode = null;
 
         $order = $this->getOrderInfoCommon($orderNr);
-        if (!is_null($order) && !isset($order['errorCode'])) {
+        if (!is_null($order) && !isset($order['error']) && !isset($order['errorCode'])) {
             if(strtoupper($status) == strtoupper(config('app.order_cancel_status'))) {
                 foreach ($order['items'] as $key => $ozonOrderItem) {
                     array_push($toCancel, $ozonOrderItem['item_id']);
@@ -2086,7 +2087,6 @@ class OzonService
                 }
             }
 
-            $httpCode = null;
             // if(strtoupper($status) == strtoupper(config('app.order_approve_status')))
             // {
             //     Log::info($this->interactionId . ' => Approve ozon order:' . strval($order['ozon_order_id']));
@@ -2167,7 +2167,7 @@ class OzonService
     public function setOrderStatus($orderNr, $status, $trackingNumber, $orderItems)
     {
         $order = $this->getOrderInfoCommon($orderNr);
-        if (!is_null($order) && !isset($order['errorCode'])) {
+        if (!is_null($order) && !isset($order['error']) && !isset($order['errorCode'])) {
             $items = [];
             $itemsFull = [];
             $shippingProviderId = null;
@@ -2271,7 +2271,7 @@ class OzonService
                 $orderInfo = $this->getOrderInfo($order->ozon_order_id);
                 Log::info(json_encode($orderInfo, JSON_UNESCAPED_UNICODE));
                 Log::info(json_encode($orderInfo, JSON_UNESCAPED_UNICODE));
-                if (!is_null($orderInfo) && !isset($orderInfo['errorCode'])) {
+                if (!is_null($orderInfo) && !isset($orderInfo['error']) && !isset($orderInfo['errorCode'])) {
                     $orders = app('db')->connection('mysql')->table('orders')
                         ->where('id', $order->id)
                         ->update(['ozon_order_nr' => $orderInfo['order_nr']]);

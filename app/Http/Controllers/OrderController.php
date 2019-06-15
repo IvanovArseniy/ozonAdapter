@@ -47,13 +47,25 @@ class OrderController extends BaseController
             isset($statusInfo['items']) ? $statusInfo['items'] : null);
         Log::info($interactionId . ' => Set order status result:'. json_encode($result));
         if (!is_null($result) && isset($result['http_code']) && inval($result['http_code']) == 200) {
-            return response()->json($result);
+            return response()->json([
+                'order_id' => $result['order_id'],
+                'fulfillmentStatus' => $result['fulfillmentStatus'],
+                'response' => $result['response'],
+            ]);
         }
         elseif (!is_null($result) && isset($result['http_code']) && inval($result['http_code']) != 200) {
-            return response()->json($result, $result['http_code']);
+            return response()->json([
+                'order_id' => $result['order_id'],
+                'fulfillmentStatus' => $result['fulfillmentStatus'],
+                'response' => $result['response'],
+            ], $result['http_code']);
         }
         else {
-            return response()->json($result, 500);
+            return response()->json([
+                'order_id' => $result['order_id'],
+                'fulfillmentStatus' => $result['fulfillmentStatus'],
+                'response' => $result['response'],
+            ], 500);
         }
     }
 
