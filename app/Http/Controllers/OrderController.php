@@ -46,7 +46,7 @@ class OrderController extends BaseController
             isset($statusInfo['trackingNumber']) ? $statusInfo['trackingNumber'] : null,
             isset($statusInfo['items']) ? $statusInfo['items'] : null);
         Log::info($interactionId . ' => Set order status result:'. json_encode($result));
-        if (!is_null($result) && isset($result['http_code']) && inval($result['http_code']) == 200) {
+        if (!is_null($result) && isset($result['http_code']) && intval($result['http_code']) == 200) {
             return response()->json([
                 'order_id' => $result['order_id'],
                 'fulfillmentStatus' => $result['fulfillmentStatus'],
