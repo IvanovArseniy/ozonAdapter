@@ -469,6 +469,7 @@ class OzonService
 
         if (isset($ozonProductResult['result'])) {
             $updateFields = [];
+            $updateFields = ['sent_date' => date('Y-m-d\TH:i:s.u')];
             $updateNeeded = false;
 
             if (isset($product['price'])) {
@@ -564,7 +565,12 @@ class OzonService
                     ->where('id', $variant->id)
                     ->update($updateFields);
             
-                    $sendStockResult = $this->sendStockAndPriceForProduct($message);
+                    try {
+                        GearmanService::addPriceAndStock($message);
+                    }
+                    catch (\Exception $e) {
+                        Log::error('Adding message to gearman queue failed!');
+                    }
                 }
                 else {
                     $errors[$variant->product_id] = 'Product with id=' . $variant->product_id . ' not created yet in ozon';
