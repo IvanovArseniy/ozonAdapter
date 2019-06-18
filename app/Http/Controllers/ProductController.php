@@ -196,4 +196,17 @@ class ProductController extends BaseController
 
         return response()->json(['OK']);
     }
+
+    public function testMethod()
+    {
+        $result = ['result' => 'OK'];
+        // $ozonService = new OzonService();
+        // $result = $ozonService->scheduleActivation();
+
+        // $dropshippService = new DropshippService();
+        // $result = $dropshippService->test();
+
+        // $result = GearmanService::addForRetry([]);
+        return response()->json($result);
+    }
 }
