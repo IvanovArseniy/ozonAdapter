@@ -24,6 +24,13 @@ class GearmanService
         $client->doBackground('setOzonIds', json_encode($data));
     }
 
+    public static function addForRetry($data)
+    {
+        $client = new \GearmanClient();
+        $client->addServers('localhost');
+        $client->doBackground('processForRetry', json_encode($data));
+    }
+
     public static function processStockAndPrice(\GearmanJob $job)
     {
         $data = $job->workload();
@@ -74,16 +81,21 @@ class GearmanService
                     'unique_key' => $job->unique(),
                     'function_name' => $job->functionName(),
                     'data' => json_encode($resultedData['data']),
+                    'processing' => 0
                 ]
             );
         }
     }
 
-    public static function addForRetry()
-    {
+   public static function processForRetry(\GearmanJob $job)
+   {
         $success = false;
         try {
+            app('db')->connection('mysql')->table('gearman_retry_queue')
+                ->update(['processing' => 1]);
+
             $res = app('db')->connection('mysql')->table('gearman_retry_queue')
+                ->where('processing', 1)
                 ->get();
             if ($res) {
                 foreach ($res as $key => $row) {
