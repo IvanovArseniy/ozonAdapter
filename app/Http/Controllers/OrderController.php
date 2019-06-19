@@ -19,28 +19,13 @@ class OrderController extends BaseController
         return response()->json($result);
     }
 
-    public function setOrderStatus1(OzonService $ozonService, Request $request, $orderNr)
-    {
-        $interactionId = $ozonService->getInteractionId();
-        Log::info($interactionId . ' => Set order status:'. $orderNr);
-        Log::info($interactionId . ' => Set order status:'. json_encode($request->getContent()));
-        $statusInfo = json_decode($request->getContent(), true);
-        $result = $ozonService->setOrderStatus(
-            $orderNr,
-            $statusInfo['fulfillmentStatus'],
-            isset($statusInfo['trackingNumber']) ? $statusInfo['trackingNumber'] : null,
-            isset($statusInfo['items']) ? $statusInfo['items'] : null);
-        Log::info($interactionId . ' => Set order status result:'. json_encode($result));
-        return response()->json($result);
-    }
-
     public function setOrderStatus(OzonService $ozonService, Request $request, $orderNr)
     {
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Set order status:'. $orderNr);
         Log::info($interactionId . ' => Set order status:'. json_encode($request->getContent()));
         $statusInfo = json_decode($request->getContent(), true);
-        $result = $ozonService->setOrderStatus1(
+        $result = $ozonService->setOrderStatus(
             $orderNr,
             $statusInfo['fulfillmentStatus'],
             isset($statusInfo['trackingNumber']) ? $statusInfo['trackingNumber'] : null,
