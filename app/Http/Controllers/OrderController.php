@@ -38,7 +38,7 @@ class OrderController extends BaseController
                 'response' => $result['response'],
             ]);
         }
-        elseif (!is_null($result) && isset($result['http_code']) && inval($result['http_code']) != 200) {
+        elseif (!is_null($result) && isset($result['http_code']) && intval($result['http_code']) != 200) {
             return response()->json([
                 'order_id' => $result['order_id'],
                 'fulfillmentStatus' => $result['fulfillmentStatus'],
