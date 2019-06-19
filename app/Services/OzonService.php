@@ -2137,7 +2137,7 @@ class OzonService
                 $response = json_decode($response, true);
                 Log::info($this->interactionId . ' => Cancel ozon order result: ' . json_encode($response, JSON_UNESCAPED_UNICODE));
             }
-            if (strtoupper($status) == strtoupper(config('app.order_ship_status')) || strtoupper($status) == strtoupper(config('app.order_delivered_status'))) {
+            if (strtoupper($status) == strtoupper(config('app.order_ship_status'))) {
                 foreach ($toShipped as $key => $orderItemShipped) {
                     Log::info($this->interactionId . ' =>Ship ozon order:' . strval($order['ozon_order_id']));
                     $response = $this->sendData($this->shipOrderUrl, [
