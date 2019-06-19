@@ -2052,9 +2052,13 @@ class OzonService
 
         $order = $this->getOrderInfoCommon($orderNr);
         if (!is_null($order) && !isset($order['error']) && !isset($order['errorCode'])) {
-            if(strtoupper($status) == strtoupper(config('app.order_cancel_status')) || is_null($orderItems)) {
+            if(strtoupper($status) == strtoupper(config('app.order_cancel_status'))) {
                 foreach ($order['items'] as $key => $ozonOrderItem) {
                     array_push($toCancel, $ozonOrderItem['item_id']);
+                }
+            }
+            elseif(is_null($orderItems) && strtoupper($status) == strtoupper(config('app.order_approve_status'))) {
+                foreach ($order['items'] as $key => $ozonOrderItem) {
                     array_push($toApprove, $ozonOrderItem['item_id']);
                 }
             }
