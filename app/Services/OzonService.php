@@ -468,6 +468,13 @@ class OzonService
         $quantitySuccess = false;
 
         if (isset($ozonProductResult['result'])) {
+            try {
+                GearmanService::deleteRetryByQuery($product['product_id'], "processStockAndPrice");
+            }
+            catch (\Exception $e) {
+                Log::error('deleteRetryByQuery to gearman queue failed!');
+            }
+
             $updateFields = [];
             $updateFields = ['sent_date' => date('Y-m-d\TH:i:s.u')];
             $updateNeeded = false;

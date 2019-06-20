@@ -7,6 +7,7 @@ use Laravel\Lumen\Routing\Controller as BaseController;
 use Illuminate\Http\Request as Request;
 use App\Services\OzonService;
 use App\Services\DropshippService;
+use App\Services\GearmanService;
 
 class ProductController extends BaseController
 {
@@ -206,7 +207,8 @@ class ProductController extends BaseController
         // $dropshippService = new DropshippService();
         // $result = $dropshippService->test();
 
-        // $result = GearmanService::addForRetry([]);
+        $result = GearmanService::deleteRetryByQuery(11961681, "processStockAndPrice");
+        
         return response()->json($result);
     }
 }

@@ -122,4 +122,13 @@ class GearmanService
         }
         return $success;
    }
+
+   public static function deleteRetryByQuery($key, $function_name)
+   {
+        app('db')->connection('mysql')->table('gearman_retry_queue')
+            ->where('data', 'LIKE', '%"product_id":' . $key . '%')
+            ->where('function_name', $function_name)
+            ->where('processing', 0)
+            ->delete();
+   }
 }
