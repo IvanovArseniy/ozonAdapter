@@ -107,8 +107,8 @@ class GearmanService
     {
         $data = $job->workload();
         $json_data = json_decode($data, true);
-        $ozonService = new OzonService();
-        $ozonService->setOzonProductIdOld();
+        // $ozonService = new OzonService();
+        // $ozonService->setOzonProductIdOld();
     }
 
     public static function processRetry($json_data, $resultedData, $job)

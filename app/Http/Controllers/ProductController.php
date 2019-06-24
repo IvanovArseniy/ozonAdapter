@@ -198,37 +198,17 @@ class ProductController extends BaseController
         return response()->json(['OK']);
     }
 
-    public function testMethod(OzonService $ozonService, Request $request)
+    public function testMethod()
     {
-        $interactionId = $ozonService->getInteractionId();
-        $product = json_decode($request->getContent(), true);
-        Log::info($interactionId . ' => Create product:'. json_encode($product));
-        if (!is_null($product) && isset($product['name']) && isset($product['variants']) && count($product['variants']) > 0) {
-            $result = $ozonService->createNewProduct($product);
-            Log::info($interactionId . ' => Create product response:'. json_encode($result));
+        $result = ['result' => 'OK'];
+        $ozonService = new OzonService();
+        $processProductResult = $ozonService->setOzonProductId(['mall_variant_id' => '8f350454-54b7-45fb-ae95-6c3834bf4281']);
 
-            $ozonService = new OzonService();
-            $processProductResult = $ozonService->processProductToOzon(['mall_variant_id' => 'e398d9df-94d9-4175-aa35-b0e649d760e7']);
+        // $dropshippService = new DropshippService();
+        // $result = $dropshippService->test();
 
-            $ozonService = new OzonService();
-            $setOzonProductIdResult = $ozonService->setOzonProductId(['mall_variant_id' => 'e398d9df-94d9-4175-aa35-b0e649d760e7']);
-
-            return response()->json($result);
-        }
-        else {
-            return response()->json(['Error' => 'Required fields are not present!']);
-        }
-    }
-    // {
-    //     $result = ['result' => 'OK'];
-    //     // $ozonService = new OzonService();
-    //     // $result = $ozonService->scheduleActivation();
-
-    //     // $dropshippService = new DropshippService();
-    //     // $result = $dropshippService->test();
-
-    //     $result = GearmanService::deleteRetryByQuery(11961681, "processStockAndPrice");
+        // $result = GearmanService::deleteRetryByQuery(11961681, "processStockAndPrice");
         
-    //     return response()->json($result);
-    // }
+        return response()->json($processProductResult);
+    }
 }

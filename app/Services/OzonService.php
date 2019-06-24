@@ -334,7 +334,7 @@ class OzonService
 
     public function processProductToOzon($product)
     {
-        $variant = app('db')->connection('mysql')
+        $variants = app('db')->connection('mysql')
             ->select('
                 select
                     pv.id as id,
@@ -343,6 +343,7 @@ class OzonService
                     pv.inventory as inventory,
                     pv.color as color,
                     pv.size as size,
+                    p.id as productId,
                     p.sku as sku,
                     p.description as description,
                     p.name as name,
@@ -358,12 +359,12 @@ class OzonService
                 left join product p on pv.product_id = p.id
                 left join product_variant_image pvi on pv.id = pvi.product_variant_id
                 left join image i on i.id = pvi.image_id
-                where pv.deleted = 0 and i.deleted = 0 and i.is_default = 1 and pv.ozon_product_id is null and pv.sent = 0 and pv.mall_variant_id = ' . $product['mall_variant_id'] . '
+                where pv.deleted = 0 and i.deleted = 0 and i.is_default = 1 and pv.ozon_product_id is null and pv.sent = 0 and pv.mall_variant_id = "' . $product['mall_variant_id'] . '"
                 order by i.id desc
-            ')
-            ->first();
+            ');
 
-        if ($variant) {
+        if (!is_null($variants) && count($variants) > 0) {
+            $variant = $variants[0];
             if (!is_null($variant->imageUrl)) {
                 Log::info('Main image for variant:' . json_encode($variant->imageUrl));
                 $categoryResult = $this->getOzonCategory($variant->mallCategoryId, $variant->mallCategoryName);
@@ -384,7 +385,7 @@ class OzonService
                         $variant->size,
                         $variant->brand,
                         $variant->imageUrl,
-                        $productId
+                        $variant->productId
                     );
 
 
@@ -434,13 +435,21 @@ class OzonService
     {
         $response = $this->getProductFromOzonByOfferId($product['mall_variant_id']);
         $ozonProduct = json_decode($response, true);
-        $updateFields = [];
+        $updateFields = ['sent_date' => date('Y-m-d\TH:i:s.u')];
+
+        $variant = app('db')->connection('mysql')->table('product_variant')
+            ->where('mall_variant_id', $product['mall_variant_id'])
+            ->first();
         if(isset($ozonProduct['result'])) {
             $updateFields = ['ozon_product_id' => $ozonProduct['result']['id']];
+            app('db')->connection('mysql')->table('product_variant')
+                ->where('id', $variant->id)
+                ->update($updateFields);            
+
             $message = ['product_id' => $ozonProduct['result']['id']];
             $message['quantity'] = $variant->inventory;
             $message['price'] = $variant->price;
-    
+            
             try {
                 GearmanService::addPriceAndStock($message);
             }
@@ -457,9 +466,7 @@ class OzonService
                 'data' => $product
             ];
         }
-        else {
-            $updateFields = ['sent_date' => date('Y-m-d\TH:i:s.u')];
-        }
+
         app('db')->connection('mysql')->table('product_variant')
             ->where('id', $variant->id)
             ->update($updateFields);
