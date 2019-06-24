@@ -82,7 +82,7 @@ class GearmanService
         Log::info('processProductToOzon gearmanWork:' . json_encode($json_data));
 
         $ozonService = new OzonService();
-        $processProductResult = $ozonService->processProductToOzon();
+        $processProductResult = $ozonService->processProductToOzon($json_data);
 
         if (isset($processProductResult['result']) && !$processProductResult['result']) {
             GearmanService::processRetry($json_data, $processProductResult, $job);
@@ -96,7 +96,7 @@ class GearmanService
         Log::info('setOzonProductId gearmanWork:' . json_encode($json_data));
 
         $ozonService = new OzonService();
-        $setOzonProductIdResult = $ozonService->setOzonProductId();
+        $setOzonProductIdResult = $ozonService->setOzonProductId($json_data);
 
         if (isset($setOzonProductIdResult['result']) && !$setOzonProductIdResult['result']) {
             GearmanService::processRetry($json_data, $setOzonProductIdResult, $job);
@@ -151,6 +151,12 @@ class GearmanService
                     }
                     elseif ($function_name == 'processOrderNotification') {
                         GearmanService::addOrderNotification(json_decode($row->data));
+                    }
+                    elseif ($function_name == 'processProductToOzon') {
+                        GearmanService::addProcessProductToOzonNotification(json_decode($row->data));
+                    }
+                    elseif ($function_name == 'setOzonProductId') {
+                        GearmanService::addSetOzonProductIdNotification(json_decode($row->data));
                     }
 
                     app('db')->connection('mysql')->table('gearman_retry_queue')

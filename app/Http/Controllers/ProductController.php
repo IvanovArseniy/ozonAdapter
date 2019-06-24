@@ -52,8 +52,8 @@ class ProductController extends BaseController
 
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Send products and get IDs.');
-        $sendResult = $ozonService->scheduleProductCreation();
-        $sendResult = $ozonService->scheduleProductCreation();
+        // $sendResult = $ozonService->scheduleProductCreation();
+        // $sendResult = $ozonService->scheduleProductCreation();
         //$idsResult = $ozonService->setOzonProductId();
         Log::info($interactionId . ' => Send products result:' . json_encode($sendResult));
         //Log::info($interactionId . ' => Get ids result:' . json_encode($idsResult));
@@ -198,17 +198,37 @@ class ProductController extends BaseController
         return response()->json(['OK']);
     }
 
-    public function testMethod()
+    public function testMethod(OzonService $ozonService, Request $request)
     {
-        $result = ['result' => 'OK'];
-        // $ozonService = new OzonService();
-        // $result = $ozonService->scheduleActivation();
+        $interactionId = $ozonService->getInteractionId();
+        $product = json_decode($request->getContent(), true);
+        Log::info($interactionId . ' => Create product:'. json_encode($product));
+        if (!is_null($product) && isset($product['name']) && isset($product['variants']) && count($product['variants']) > 0) {
+            $result = $ozonService->createNewProduct($product);
+            Log::info($interactionId . ' => Create product response:'. json_encode($result));
 
-        // $dropshippService = new DropshippService();
-        // $result = $dropshippService->test();
+            $ozonService = new OzonService();
+            $processProductResult = $ozonService->processProductToOzon(['mall_variant_id' => 'e398d9df-94d9-4175-aa35-b0e649d760e7']);
 
-        $result = GearmanService::deleteRetryByQuery(11961681, "processStockAndPrice");
-        
-        return response()->json($result);
+            $ozonService = new OzonService();
+            $setOzonProductIdResult = $ozonService->setOzonProductId(['mall_variant_id' => 'e398d9df-94d9-4175-aa35-b0e649d760e7']);
+
+            return response()->json($result);
+        }
+        else {
+            return response()->json(['Error' => 'Required fields are not present!']);
+        }
     }
+    // {
+    //     $result = ['result' => 'OK'];
+    //     // $ozonService = new OzonService();
+    //     // $result = $ozonService->scheduleActivation();
+
+    //     // $dropshippService = new DropshippService();
+    //     // $result = $dropshippService->test();
+
+    //     $result = GearmanService::deleteRetryByQuery(11961681, "processStockAndPrice");
+        
+    //     return response()->json($result);
+    // }
 }

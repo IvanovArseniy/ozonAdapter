@@ -361,7 +361,6 @@ class OzonService
                 where pv.deleted = 0 and i.deleted = 0 and i.is_default = 1 and pv.ozon_product_id is null and pv.sent = 0 and pv.mall_variant_id = ' . $product['mall_variant_id'] . '
                 order by i.id desc
             ')
-            ->where('mall_variant_id', )
             ->first();
 
         if ($variant) {
