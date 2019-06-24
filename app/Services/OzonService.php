@@ -315,13 +315,166 @@ class OzonService
                             ]);
                     }
                 }
+
+
             } catch (\Exception $e) {
                 
             }
 
+            try {
+                GearmanService::addProcessProductToOzonNotification(['mall_variant_id' => $variant['mallVariantId']]);
+            }
+            catch (\Exception $e) {
+                Log::error('Adding order notification message to gearman queue failed!');
+            }
         }
 
         return $insertedVariants;
+    }
+
+    public function processProductToOzon($product)
+    {
+        $variants = app('db')->connection('mysql')
+            ->select('
+                select
+                    pv.id as id,
+                    pv.mall_variant_id as mallVariantId,
+                    pv.price as price,
+                    pv.inventory as inventory,
+                    pv.color as color,
+                    pv.size as size,
+                    p.id as productId,
+                    p.sku as sku,
+                    p.description as description,
+                    p.name as name,
+                    p.weight as weight,
+                    p.unlimited as unlimited,
+                    p.enabled as enabled,
+                    p.default_category as defaultCategory,
+                    p.mall_category_id as mallCategoryId,
+                    p.mall_category_name as mallCategoryName, 
+                    p.brand as brand,
+                    i.image_url as imageUrl
+                from product_variant pv
+                left join product p on pv.product_id = p.id
+                left join product_variant_image pvi on pv.id = pvi.product_variant_id
+                left join image i on i.id = pvi.image_id
+                where pv.deleted = 0 and i.deleted = 0 and i.is_default = 1 and pv.ozon_product_id is null and pv.sent = 0 and pv.mall_variant_id = "' . $product['mall_variant_id'] . '"
+                order by i.id desc
+            ');
+
+        if (!is_null($variants) && count($variants) > 0) {
+            $variant = $variants[0];
+            if (!is_null($variant->imageUrl)) {
+                Log::info('Main image for variant:' . json_encode($variant->imageUrl));
+                $categoryResult = $this->getOzonCategory($variant->mallCategoryId, $variant->mallCategoryName);
+                Log::info('Category search result:' . json_encode($categoryResult));
+                if (!isset($categoryResult['error']) && !is_null($categoryResult['categoryId'])) {
+                    $item = $this->addProductToRequest(
+                        $variant->mallVariantId,
+                        $variant->sku,
+                        $variant->description,
+                        $variant->name,
+                        $variant->price,
+                        $variant->weight,
+                        $variant->inventory,
+                        !$variant->unlimited,
+                        $variant->enabled,
+                        $categoryResult['categoryId'],
+                        $variant->color,
+                        $variant->size,
+                        $variant->brand,
+                        $variant->imageUrl,
+                        $variant->productId
+                    );
+
+
+                    $result = null;
+                    if (config('app.enable_product_creation')) {
+                        $result = $this->sendProductsToOzon([$item]);
+                    }
+
+                    if (!config('app.enable_product_creation') || (!is_null($result) && isset($result['result']) && isset($result['result']['task_id']))) {
+                        try {
+                            GearmanService::addSetOzonProductIdNotification(['mall_variant_id' => $variant->mallVariantId]);
+                        }
+                        catch (\Exception $e) {
+                            Log::error('Adding order notification message to gearman queue failed!');
+                            return [
+                                'result' => false,
+                                'data' => $product
+                            ];
+                        }
+
+                        app('db')->connection('mysql')->table('product_variant')
+                            ->where('id', $variant->id)
+                            ->update([
+                                'sent_date' => date('Y-m-d\TH:i:s.u'),
+                                'sent' => 1
+                            ]);
+
+                        return [
+                            'result' => true,
+                            'data' => $product
+                        ];
+                    }
+                }
+            }
+            else {
+                Log::info('No main image for variant:' . json_encode($variant->mallVariantId));
+            }
+        }
+
+        return [
+            'result' => false,
+            'data' => $product
+        ];
+    }
+
+    public function setOzonProductId($product)
+    {
+        $response = $this->getProductFromOzonByOfferId($product['mall_variant_id']);
+        $ozonProduct = json_decode($response, true);
+        $updateFields = ['sent_date' => date('Y-m-d\TH:i:s.u')];
+
+        $variant = app('db')->connection('mysql')->table('product_variant')
+            ->where('mall_variant_id', $product['mall_variant_id'])
+            ->first();
+        if(isset($ozonProduct['result'])) {
+            $updateFields = ['ozon_product_id' => $ozonProduct['result']['id']];
+            app('db')->connection('mysql')->table('product_variant')
+                ->where('id', $variant->id)
+                ->update($updateFields);            
+
+            $message = ['product_id' => $ozonProduct['result']['id']];
+            $message['quantity'] = $variant->inventory;
+            $message['price'] = $variant->price;
+            
+            try {
+                GearmanService::addPriceAndStock($message);
+            }
+            catch (\Exception $e) {
+                Log::error('Adding order notification message to gearman queue failed!');
+                return [
+                    'result' => false,
+                    'data' => $product
+                ];
+            }
+
+            return [
+                'result' => true,
+                'data' => $product
+            ];
+        }
+
+        app('db')->connection('mysql')->table('product_variant')
+            ->where('id', $variant->id)
+            ->update($updateFields);
+
+        return [
+            'result' => false,
+            'data' => $product
+        ];
     }
 
     public function scheduleProductCreation($productId = null)
@@ -421,7 +574,7 @@ class OzonService
                             $variant->imageUrl,
                             $productId
                         );
-                        if (!isset($item['success'])) {
+                        if (!isset($item['error'])) {
                             array_push($items, $item);
                             array_push($variantIds, $variant->id);
                         }
@@ -547,7 +700,7 @@ class OzonService
         ];
     }
 
-    public function setOzonProductId()
+    public function setOzonProductIdOld()
     {
         try {
             $variants = app('db')->connection('mysql')->table('product_variant')
@@ -662,7 +815,7 @@ class OzonService
             return $result;
         }
         else return [
-            'success' => false
+            'error' => true
         ];
     }
 
@@ -1330,7 +1483,6 @@ class OzonService
         $productVariants = $this->getProductVariants($productId);
         if (!is_null($productVariants)) {
             foreach ($productVariants as $key => $variant) {
-                $ozonProductInfo = $this->getProductInfo($variant->ozon_product_id);
                 $ozonProductInfo = $this->getProductInfo($variant->ozonProductId);
                 if (isset($ozonProductInfo['result'])) {
                     $imageResult = $this->getImages($ozonProductInfo['result']['images'], $variant->id);

@@ -6,16 +6,25 @@ use DateTime;
 
 class GearmanService
 {
-    public static function addPriceAndStock($data) {
+    public static function addPriceAndStock($data)
+    {
         $client = new \GearmanClient();
         $client->addServers('localhost');
         $client->doBackground('processStockAndPrice', json_encode($data));
     }
 
-    public static function addOrderNotification($data) {
+    public static function addOrderNotification($data)
+    {
         $client = new \GearmanClient();
         $client->addServers('localhost');
         $client->doBackground('processOrderNotification', json_encode($data));
+    }
+
+    public static function addProcessProductToOzonNotification($data)
+    {
+        $client = new \GearmanClient();
+        $client->addServers('localhost');
+        $client->doBackground('processProductToOzon', json_encode($data));
     }
 
     public static function addSetOzonIds($data) {
@@ -24,6 +33,13 @@ class GearmanService
         $client->doBackground('setOzonIds', json_encode($data));
     }
 
+    public static function addSetOzonProductIdNotification($data)
+    {
+        $client = new \GearmanClient();
+        $client->addServers('localhost');
+        $client->doBackground('setOzonProductId', json_encode($data));
+    }
+    
     public static function addForRetry($data)
     {
         $client = new \GearmanClient();
@@ -59,12 +75,40 @@ class GearmanService
         }
     }
 
+    public static function processProductToOzon(\GearmanJob $job)
+    {
+        $data = $job->workload();
+        $json_data = json_decode($data, true);
+        Log::info('processProductToOzon gearmanWork:' . json_encode($json_data));
+
+        $ozonService = new OzonService();
+        $processProductResult = $ozonService->processProductToOzon($json_data);
+
+        if (isset($processProductResult['result']) && !$processProductResult['result']) {
+            GearmanService::processRetry($json_data, $processProductResult, $job);
+        }
+    }
+
+    public static function setOzonProductId(\GearmanJob $job)
+    {
+        $data = $job->workload();
+        $json_data = json_decode($data, true);
+        Log::info('setOzonProductId gearmanWork:' . json_encode($json_data));
+
+        $ozonService = new OzonService();
+        $setOzonProductIdResult = $ozonService->setOzonProductId($json_data);
+
+        if (isset($setOzonProductIdResult['result']) && !$setOzonProductIdResult['result']) {
+            GearmanService::processRetry($json_data, $setOzonProductIdResult, $job);
+        }
+    }
+
     public static function setOzonIds(\GearmanJob $job)
     {
         $data = $job->workload();
         $json_data = json_decode($data, true);
-        $ozonService = new OzonService();
-        $ozonService->setOzonProductId();
+        // $ozonService = new OzonService();
+        // $ozonService->setOzonProductIdOld();
     }
 
     public static function processRetry($json_data, $resultedData, $job)
@@ -107,6 +151,12 @@ class GearmanService
                     }
                     elseif ($function_name == 'processOrderNotification') {
                         GearmanService::addOrderNotification(json_decode($row->data));
+                    }
+                    elseif ($function_name == 'processProductToOzon') {
+                        GearmanService::addProcessProductToOzonNotification(json_decode($row->data));
+                    }
+                    elseif ($function_name == 'setOzonProductId') {
+                        GearmanService::addSetOzonProductIdNotification(json_decode($row->data));
                     }
 
                     app('db')->connection('mysql')->table('gearman_retry_queue')

@@ -52,8 +52,8 @@ class ProductController extends BaseController
 
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Send products and get IDs.');
-        $sendResult = $ozonService->scheduleProductCreation();
-        $sendResult = $ozonService->scheduleProductCreation();
+        // $sendResult = $ozonService->scheduleProductCreation();
+        // $sendResult = $ozonService->scheduleProductCreation();
         //$idsResult = $ozonService->setOzonProductId();
         Log::info($interactionId . ' => Send products result:' . json_encode($sendResult));
         //Log::info($interactionId . ' => Get ids result:' . json_encode($idsResult));
@@ -201,14 +201,14 @@ class ProductController extends BaseController
     public function testMethod()
     {
         $result = ['result' => 'OK'];
-        // $ozonService = new OzonService();
-        // $result = $ozonService->scheduleActivation();
+        $ozonService = new OzonService();
+        $processProductResult = $ozonService->processProductToOzon(['mall_variant_id' => '8f350454-54b7-45fb-ae95-6c3834bf4281']);
 
         // $dropshippService = new DropshippService();
         // $result = $dropshippService->test();
 
-        $result = GearmanService::deleteRetryByQuery(11961681, "processStockAndPrice");
+        // $result = GearmanService::deleteRetryByQuery(11961681, "processStockAndPrice");
         
-        return response()->json($result);
+        return response()->json($processProductResult);
     }
 }
