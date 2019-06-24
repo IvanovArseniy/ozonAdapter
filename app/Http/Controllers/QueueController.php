@@ -11,7 +11,7 @@ class QueueController extends BaseController
 {
     public function addForRetry()
     {
-        $success = GearmanService::addForRetry();
+        $success = GearmanService::addForRetry([]);
         return response()->json(['result' => $success]);
     }
 }

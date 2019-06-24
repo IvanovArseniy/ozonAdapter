@@ -19,7 +19,7 @@ class OrderController extends BaseController
         return response()->json($result);
     }
 
-    public function setOrderStatus1(OzonService $ozonService, Request $request, $orderNr)
+    public function setOrderStatus(OzonService $ozonService, Request $request, $orderNr)
     {
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Set order status:'. $orderNr);
@@ -31,22 +31,27 @@ class OrderController extends BaseController
             isset($statusInfo['trackingNumber']) ? $statusInfo['trackingNumber'] : null,
             isset($statusInfo['items']) ? $statusInfo['items'] : null);
         Log::info($interactionId . ' => Set order status result:'. json_encode($result));
-        return response()->json($result);
-    }
-
-    public function setOrderStatus(OzonService $ozonService, Request $request, $orderNr)
-    {
-        $interactionId = $ozonService->getInteractionId();
-        Log::info($interactionId . ' => Set order status:'. $orderNr);
-        Log::info($interactionId . ' => Set order status:'. json_encode($request->getContent()));
-        $statusInfo = json_decode($request->getContent(), true);
-        $result = $ozonService->setOrderStatus1(
-            $orderNr,
-            $statusInfo['fulfillmentStatus'],
-            isset($statusInfo['trackingNumber']) ? $statusInfo['trackingNumber'] : null,
-            isset($statusInfo['items']) ? $statusInfo['items'] : null);
-        Log::info($interactionId . ' => Set order status result:'. json_encode($result));
-        return response()->json($result);
+        if (!is_null($result) && isset($result['http_code']) && intval($result['http_code']) == 200) {
+            return response()->json([
+                'order_id' => $result['order_id'],
+                'fulfillmentStatus' => $result['fulfillmentStatus'],
+                'response' => $result['response'],
+            ]);
+        }
+        elseif (!is_null($result) && isset($result['http_code']) && intval($result['http_code']) != 200) {
+            return response()->json([
+                'order_id' => $result['order_id'],
+                'fulfillmentStatus' => $result['fulfillmentStatus'],
+                'response' => $result['response'],
+            ], $result['http_code']);
+        }
+        else {
+            return response()->json([
+                'order_id' => $result['order_id'],
+                'fulfillmentStatus' => $result['fulfillmentStatus'],
+                'response' => $result['response'],
+            ], 500);
+        }
     }
 
     public function getOrderList(OzonService $ozonService, DropshippService $dropshippService)

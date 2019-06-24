@@ -160,6 +160,7 @@ class OzonService
 
         Log::info($this->interactionId . ' => Get product info from ozon:' . json_encode(['product_id' => $ozonProductId], JSON_UNESCAPED_UNICODE));
         $response = $this->sendData($this->productInfoUrl, ['product_id' => $ozonProductId]);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Ozon products: ' . $response);
         return $response;
     }
@@ -168,6 +169,7 @@ class OzonService
     {
         Log::info($this->interactionId . ' => Get product info from ozon by sku:' . json_encode(['offer_id' => $offerId], JSON_UNESCAPED_UNICODE));
         $response = $this->sendData($this->productInfoUrl, ['offer_id' => $offerId]);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Ozon products: ' . $response);
         return $response;
     }
@@ -613,7 +615,15 @@ class OzonService
         $quantitySuccess = false;
 
         if (isset($ozonProductResult['result'])) {
+            try {
+                GearmanService::deleteRetryByQuery($product['product_id'], "processStockAndPrice");
+            }
+            catch (\Exception $e) {
+                Log::error('deleteRetryByQuery to gearman queue failed!');
+            }
+
             $updateFields = [];
+            $updateFields = ['sent_date' => date('Y-m-d\TH:i:s.u')];
             $updateNeeded = false;
 
             if (isset($product['price'])) {
@@ -689,6 +699,7 @@ class OzonService
         try {
             $variants = app('db')->connection('mysql')->table('product_variant')
             ->whereNull('ozon_product_id')
+            ->where('deleted', 0)
             ->orderBy('sent_date','asc')
             ->take(20)
             ->get();
@@ -703,16 +714,25 @@ class OzonService
                     $message = ['product_id' => $ozonProduct['result']['id']];
                     $message['quantity'] = $variant->inventory;
                     $message['price'] = $variant->price;
+
+                    app('db')->connection('mysql')->table('product_variant')
+                    ->where('id', $variant->id)
+                    ->update($updateFields);
             
-                    $sendStockResult = $ozonService->sendStockAndPriceForProduct($message);
+                    try {
+                        GearmanService::addPriceAndStock($message);
+                    }
+                    catch (\Exception $e) {
+                        Log::error('Adding message to gearman queue failed!');
+                    }
                 }
                 else {
                     $errors[$variant->product_id] = 'Product with id=' . $variant->product_id . ' not created yet in ozon';
                     $updateFields = ['sent_date' => date('Y-m-d\TH:i:s.u')];
-                }
-                app('db')->connection('mysql')->table('product_variant')
+                    app('db')->connection('mysql')->table('product_variant')
                     ->where('id', $variant->id)
                     ->update($updateFields);
+                }
             }
         }
         catch (\Exception $e) {
@@ -731,6 +751,7 @@ class OzonService
     protected function sendProductsToOzon($items) {
         Log::info($this->interactionId . ' => Import product request to ozon:' . json_encode(['items' => $items], JSON_UNESCAPED_UNICODE));
         $response = $this->sendData($this->importProductsUrl, ['items' => $items]);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Import ozon products: ' . $response);
         $result = json_decode($response, true);
         return $result;
@@ -902,6 +923,7 @@ class OzonService
     {
         Log::info($this->interactionId . ' => Update stocks request to ozon:' . json_encode(['stocks' => $items], JSON_UNESCAPED_UNICODE));
         $response = $this->sendData($this->updateStocksUrl, ['stocks' => $items]);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Update stocks response: ' . $response);
         $result = json_decode($response, true);
         return $result;
@@ -1208,6 +1230,7 @@ class OzonService
                 if ($updateNeeded) {
                     Log::info($this->interactionId . ' => Update product request to ozon:' . json_encode($request, JSON_UNESCAPED_UNICODE));
                     $response = $this->sendData($this->updateProductUrl, $request);
+                    $response = $response['response'];
                     Log::info($this->interactionId . ' => Update product response: ' . $response);
                     $result = json_decode($response, true);
                 }
@@ -1306,6 +1329,7 @@ class OzonService
     {
         Log::info($this->interactionId . ' => Update prices request to ozon:' . json_encode(['prices' => [$items]], JSON_UNESCAPED_UNICODE));
         $response = $this->sendData($this->updatePricesUrl, ['prices' => [$items]]);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Update prices response: ' . $response);
         $result = json_decode($response, true);
         return $result;
@@ -1328,6 +1352,7 @@ class OzonService
     {
         Log::info($this->interactionId . ' => Activate ozon product: ' . $ozonProductId);
         $response = $this->sendData($this->activateProductUrl, ['product_id' => $ozonProductId]);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Activate ozon product result: ' . $response);
         return $response;
     }
@@ -1336,6 +1361,7 @@ class OzonService
     {
         Log::info($this->interactionId . ' => Deactivate ozon product: ' . $ozonProductId);
         $response = $this->sendData($this->deactivateProductUrl, ['product_id' => $ozonProductId]);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Deactivate ozon product result: ' . $response);
         return $response;
     }
@@ -1451,7 +1477,7 @@ class OzonService
         $productVariants = $this->getProductVariants($productId);
         if (!is_null($productVariants)) {
             foreach ($productVariants as $key => $variant) {
-                $ozonProductInfo = $this->getProductInfo($variant->ozon_product_id);
+                $ozonProductInfo = $this->getProductInfo($variant->ozonProductId);
                 if (isset($ozonProductInfo['result'])) {
                     $imageResult = $this->getImages($ozonProductInfo['result']['images'], $variant->id);
                     $images = array();
@@ -1638,6 +1664,7 @@ class OzonService
         ];
         Log::info($this->interactionId . ' => Get products from ozon:' . $data);
         $response = $this->sendData($this->productListUrl, $data);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Ozon products info: ' . $response);
         $result = json_decode($response, true);
         return $result;
@@ -1858,6 +1885,7 @@ class OzonService
 
         Log::info($this->interactionId . ' => Get orders from ozon:' . json_encode($data, JSON_UNESCAPED_UNICODE));
         $response = $this->sendData($this->orderListUrl, $data);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Ozon order info: ' . $response);
         $result = json_decode($response, true);
 
@@ -2021,7 +2049,7 @@ class OzonService
         }
         $order =  $this->getOzonOrderInfo($orderResult->ozon_order_id);
 
-        if (!is_null($order)) {
+        if (!isset($order['error']) && !isset($order['errorCode'])) {
             return $this->mapOrder($order['result']);
         }
         return $order;
@@ -2031,6 +2059,7 @@ class OzonService
     {
         Log::info($this->interactionId . ' => Get order info from ozon: ' . $ozonOrderId);
         $response = $this->sendData(str_replace('{orderId}', $ozonOrderId, $this->orderInfoUrl), null);
+        $response = $response['response'];
         Log::info($this->interactionId . ' => Ozon order info: ' . $response);
         $order = json_decode($response, true);
 
@@ -2086,7 +2115,7 @@ class OzonService
             return $order;
         }
         else {
-            return null;
+            return $order;
         }
     }
 
@@ -2166,18 +2195,24 @@ class OzonService
         }
     }
 
-    public function setOrderStatus1($orderNr, $status, $trackingNumber, $orderItems)
+    public function setOrderStatus($orderNr, $status, $trackingNumber, $orderItems)
     {
         $response = null;
         $toApprove = [];
         $toCancel = [];
         $toShipped = [];
+        $httpCode = null;
 
         $order = $this->getOrderInfoCommon($orderNr);
-        if (!is_null($order) && !isset($order['errorCode'])) {
+        if (!is_null($order) && !isset($order['error']) && !isset($order['errorCode'])) {
             if(strtoupper($status) == strtoupper(config('app.order_cancel_status'))) {
                 foreach ($order['items'] as $key => $ozonOrderItem) {
                     array_push($toCancel, $ozonOrderItem['item_id']);
+                }
+            }
+            elseif(is_null($orderItems) && strtoupper($status) == strtoupper(config('app.order_approve_status'))) {
+                foreach ($order['items'] as $key => $ozonOrderItem) {
+                    array_push($toApprove, $ozonOrderItem['item_id']);
                 }
             }
             else {
@@ -2216,19 +2251,22 @@ class OzonService
                     }
                 }
             }
-            // if(strtoupper($status) == strtoupper(config('app.order_approve_status')))
-            // {
-            //     Log::info($this->interactionId . ' => Approve ozon order:' . strval($order['ozon_order_id']));
-            //     $response = $this->sendData($this->approveOrderUrl, [
-            //         'order_id' => $order['ozon_order_id'],
-            //         'item_ids' => $toApprove
-            //     ]);
-            //     $response = json_decode($response, true);
-            //     app('db')->connection('mysql')->table('orders')
-            //         ->where('ozon_order_id', $order['ozon_order_id'])
-            //         ->update(['status' => config('app.ozon_order_status.AWAITING_PACKAGING')]);
-            //     Log::info($this->interactionId . ' => Approve ozon order result: ' . json_encode($response, JSON_UNESCAPED_UNICODE));
-            // }
+
+            if(strtoupper($status) == strtoupper(config('app.order_approve_status')))
+            {
+                Log::info($this->interactionId . ' => Approve ozon order:' . strval($order['ozon_order_id']));
+                $response = $this->sendData($this->approveOrderUrl, [
+                    'order_id' => $order['ozon_order_id'],
+                    'item_ids' => $toApprove
+                ]);
+                    $httpCode = $response['http_code'];
+                    $response = $response['response'];
+                $response = json_decode($response, true);
+                app('db')->connection('mysql')->table('orders')
+                    ->where('ozon_order_id', $order['ozon_order_id'])
+                    ->update(['status' => config('app.ozon_order_status.AWAITING_PACKAGING')]);
+                Log::info($this->interactionId . ' => Approve ozon order result: ' . json_encode($response, JSON_UNESCAPED_UNICODE));
+            }
             if(strtoupper($status) == strtoupper(config('app.order_cancel_status')) || count($toCancel) > 0)
             {
                 if (strtoupper($status) == strtoupper(config('app.order_cancel_status'))) {
@@ -2240,6 +2278,8 @@ class OzonService
                     'reason_code' => config('app.order_cancel_reason'),
                     'item_ids' => $toCancel
                 ]);
+                $httpCode = $response['http_code'];
+                $response = $response['response'];
 
                 if (strtoupper($status) == strtoupper(config('app.order_cancel_status'))) {
                     app('db')->connection('mysql')->table('orders')
@@ -2250,7 +2290,7 @@ class OzonService
                 $response = json_decode($response, true);
                 Log::info($this->interactionId . ' => Cancel ozon order result: ' . json_encode($response, JSON_UNESCAPED_UNICODE));
             }
-            if (strtoupper($status) == strtoupper(config('app.order_ship_status')) || strtoupper($status) == strtoupper(config('app.order_delivered_status'))) {
+            if (strtoupper($status) == strtoupper(config('app.order_ship_status'))) {
                 foreach ($toShipped as $key => $orderItemShipped) {
                     Log::info($this->interactionId . ' =>Ship ozon order:' . strval($order['ozon_order_id']));
                     $response = $this->sendData($this->shipOrderUrl, [
@@ -2262,6 +2302,8 @@ class OzonService
                             'quantity' => $orderItemShipped['quantity']
                         ]]
                     ]);
+                    $httpCode = $response['http_code'];
+                    $response = $response['response'];
                     $response = json_decode($response, true);
                     Log::info($this->interactionId . ' => Ship ozon order result: ' . json_encode($response, JSON_UNESCAPED_UNICODE));
                 }
@@ -2272,109 +2314,19 @@ class OzonService
             return [
                 'order_id' => $orderNr,
                 'fulfillmentStatus' => $status,
-                'response' => $response
+                'response' => $response,
+                'success' => !isset($response['error']),
+                'http_code' => $httpCode
             ];
         }
         else {
             return [
                 'order_id' => $orderNr,
                 'fulfillmentStatus' => $status,
-                'response' => 'null'
+                'response' => 'null',
+                'http_code' => $httpCode
             ];
         }
-    }
-
-    public function setOrderStatus($orderNr, $status, $trackingNumber, $orderItems)
-    {
-        $order = $this->getOrderInfoCommon($orderNr);
-        if (!is_null($order) && !isset($order['errorCode'])) {
-            $items = [];
-            $itemsFull = [];
-            $shippingProviderId = null;
-            foreach ($order['items'] as $key => $item) {
-                array_push($items, $item['item_id']);
-                $shippingProviderId = $item['shippingProviderId'];
-            }
-
-            $response = null;
-            if(strtoupper($status) == strtoupper(config('app.order_approve_status')))
-            {
-                Log::info($this->interactionId . ' => Approve ozon order:' . strval($order['ozon_order_id']));
-                $response = $this->sendData($this->approveOrderUrl, [
-                    'order_id' => $order['ozon_order_id'],
-                    'item_ids' => $items
-                ]);
-                $response = json_decode($response, true);
-                app('db')->connection('mysql')->table('orders')
-                    ->where('ozon_order_id', $order['ozon_order_id'])
-                    ->update(['status' => config('app.ozon_order_status.AWAITING_PACKAGING')]);
-                Log::info($this->interactionId . ' => Approve ozon order result: ' . json_encode($response, JSON_UNESCAPED_UNICODE));
-            }
-            if(strtoupper($status) == strtoupper(config('app.order_cancel_status')))
-            {
-                Log::info($this->interactionId . ' =>Cancel ozon order:' . strval($order['ozon_order_id']));
-                $response = $this->sendData($this->cancelOrderUrl, [
-                    'order_id' => $order['ozon_order_id'],
-                    'reason_code' => config('app.order_cancel_reason'),
-                    'item_ids' => $items
-                ]);
-
-                app('db')->connection('mysql')->table('orders')
-                    ->where('ozon_order_id', $order['ozon_order_id'])
-                    ->update(['status' => config('app.ozon_order_status.CANCELLED')]);
-
-                $response = json_decode($response, true);
-                Log::info($this->interactionId . ' => Cancel ozon order result: ' . json_encode($response, JSON_UNESCAPED_UNICODE));
-            }
-            if (strtoupper($status) == strtoupper(config('app.order_ship_status'))) {
-                foreach ($orderItems as $key => $orderItem) {
-                    $itemId = null;
-                    $quantity = null;
-                    foreach ($order['items'] as $key => $ozonItem) {
-                        if ($orderItem['mallVariantId'] == $ozonItem['mallVariantId']) {
-                            $itemId = $ozonItem['item_id'];
-                            $quantity = $orderItem['quantity'];
-                            break;
-                        }
-                    }
-
-                    if (!is_null($itemId) && !is_null($quantity)) {
-                        Log::info($this->interactionId . ' =>Ship ozon order:' . strval($order['ozon_order_id']));
-                        $response = $this->sendData($this->shipOrderUrl, [
-                            'order_id' => $order['ozon_order_id'],
-                            "shipping_provider_id" =>  config('app.russianpost_shipping_provider'),
-                            "tracking_number" => $orderItem['trackingNumber'],
-                            'items' => [[
-                                'item_id' => $itemId,
-                                'quantity' => $quantity
-                            ]]
-                        ]);
-                        $response = json_decode($response, true);
-                        Log::info($this->interactionId . ' => Ship ozon order result: ' . json_encode($response, JSON_UNESCAPED_UNICODE));
-                    }
-                    else {
-                        Log::error($this->interactionId . ' => Item not found: ' . json_encode($orderItem['mallVariantId'], JSON_UNESCAPED_UNICODE));
-                    }
-                }
-            }
-
-            if (!is_null($response)) {
-                return [
-                    'order_id' => $orderNr,
-                    'fulfillmentStatus' => $status,
-                    'response' => $response
-                ];
-            }
-            else {
-                return [
-                    'order_id' => $orderNr,
-                    'fulfillmentStatus' => $status,
-                    'response' => 'null'
-                ];
-            }
-        }
-
-        return $order;
     }
 
     public function setOrderNr()
@@ -2388,7 +2340,7 @@ class OzonService
                 $orderInfo = $this->getOrderInfo($order->ozon_order_id);
                 Log::info(json_encode($orderInfo, JSON_UNESCAPED_UNICODE));
                 Log::info(json_encode($orderInfo, JSON_UNESCAPED_UNICODE));
-                if (!is_null($orderInfo) && !isset($orderInfo['errorCode'])) {
+                if (!is_null($orderInfo) && !isset($orderInfo['error']) && !isset($orderInfo['errorCode'])) {
                     $orders = app('db')->connection('mysql')->table('orders')
                         ->where('id', $order->id)
                         ->update(['ozon_order_nr' => $orderInfo['order_nr']]);
@@ -2431,6 +2383,7 @@ class OzonService
     public function insertCategories()
     {
         $response = $this->sendData($this->categoryListUrl, null);
+        $response = $response['response'];
         $result = json_decode($response, true);
         $this->insertChildCategories($result['result'], '');
     }
@@ -2451,6 +2404,7 @@ class OzonService
                 }
                 if ($categoryResult) {
                     $response = $this->sendData(str_replace('{category_id}', $category['category_id'], $this->categoryAttributeListUrl), null);
+                    $response = $response['response'];
                     $result = json_decode($response, true);
                     foreach ($result['result'] as $key => $attribute) {
                         if(!in_array($attribute['id'], $this->attributes)) {
@@ -2537,7 +2491,15 @@ class OzonService
         Log::info($this->interactionId . ' => Url: ' . $this->baseUrl . $url);
         Log::info($this->interactionId . ' => Data: ' . json_encode($data, JSON_UNESCAPED_UNICODE));
         $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        return $response;
+
+        Log::info('Response http code:' . $http_code);
+        Log::info('Response data:' . json_encode($response));
+        
+        return [
+            'http_code' => $http_code,
+            'response' => $response
+        ];
     }
 }

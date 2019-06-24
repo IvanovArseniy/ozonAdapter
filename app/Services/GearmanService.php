@@ -39,6 +39,13 @@ class GearmanService
         $client->addServers('localhost');
         $client->doBackground('setOzonProductId', json_encode($data));
     }
+    
+    public static function addForRetry($data)
+    {
+        $client = new \GearmanClient();
+        $client->addServers('localhost');
+        $client->doBackground('processForRetry', json_encode($data));
+    }
 
     public static function processStockAndPrice(\GearmanJob $job)
     {
@@ -118,16 +125,21 @@ class GearmanService
                     'unique_key' => $job->unique(),
                     'function_name' => $job->functionName(),
                     'data' => json_encode($resultedData['data']),
+                    'processing' => 0
                 ]
             );
         }
     }
 
-    public static function addForRetry()
-    {
+   public static function processForRetry(\GearmanJob $job)
+   {
         $success = false;
         try {
+            app('db')->connection('mysql')->table('gearman_retry_queue')
+                ->update(['processing' => 1]);
+
             $res = app('db')->connection('mysql')->table('gearman_retry_queue')
+                ->where('processing', 1)
                 ->get();
             if ($res) {
                 foreach ($res as $key => $row) {
@@ -153,5 +165,14 @@ class GearmanService
             $success = false;
         }
         return $success;
+   }
+
+   public static function deleteRetryByQuery($key, $function_name)
+   {
+        app('db')->connection('mysql')->table('gearman_retry_queue')
+            ->where('data', 'LIKE', '%"product_id":' . $key . '%')
+            ->where('function_name', $function_name)
+            ->where('processing', 0)
+            ->delete();
    }
 }

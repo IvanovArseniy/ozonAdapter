@@ -186,9 +186,19 @@ class DropshippService
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
         Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl)));
         $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         Log::info('Notify new order: ' . $response);
-        return json_decode($response, true);
+
+        $response = json_decode($response, true);
+
+        if (isset($response['error']) && $http_code == 200) {
+            $ozonService = new OzonService();
+            $statusResult = $ozonService->setOrderStatus($orderNr, config('app.order_cancel_status'), null, null);
+            return $statusResult;
+        }
+
+        return $response;
     }
 
     protected function notifyDeletedOrder($orderNr)
