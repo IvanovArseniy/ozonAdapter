@@ -2347,6 +2347,10 @@ class OzonService
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+
+        Log::info('Response http code:' . $http_code);
+        Log::info('Response data:' . json_encode($response));
+        
         return [
             'http_code' => $http_code,
             'response' => $response

@@ -1,6 +1,6 @@
 <?php
 use Monolog\Handler\StreamHandler;
-echo("fuck");
+
 return [
     /*
     |--------------------------------------------------------------------------
