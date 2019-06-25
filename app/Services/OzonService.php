@@ -425,6 +425,16 @@ class OzonService
             }
         }
 
+        $variant = app('db')->connection('mysql')->table('product_variant')
+            ->where('mall_variant_id', $product['mall_variant_id'])
+            ->first();
+        if ($variant && $variant->sent == 1 && $variant->deleted == 0) {
+            return [
+                'result' => true,
+                'data' => $product
+            ];            
+        }
+
         return [
             'result' => false,
             'data' => $product

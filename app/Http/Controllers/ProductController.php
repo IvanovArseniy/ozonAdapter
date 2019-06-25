@@ -198,17 +198,20 @@ class ProductController extends BaseController
         return response()->json(['OK']);
     }
 
-    public function testMethod()
+    public function testMethod($test)
     {
         $result = ['result' => 'OK'];
-        $ozonService = new OzonService();
-        $processProductResult = $ozonService->processProductToOzon(['mall_variant_id' => '8f350454-54b7-45fb-ae95-6c3834bf4281']);
+        // $ozonService = new OzonService();
+        // $processProductResult = $ozonService->processProductToOzon(['mall_variant_id' => '8f350454-54b7-45fb-ae95-6c3834bf4281']);
 
         // $dropshippService = new DropshippService();
         // $result = $dropshippService->test();
 
         // $result = GearmanService::deleteRetryByQuery(11961681, "processStockAndPrice");
+
+        //$resulr = boolval(preg_match('/^JNTCU(\d){10}YQ$/i', $test));
+        GearmanService::addProcessProductToOzonNotification(['mall_variant_id' => $variant['mallVariantId']]);
         
-        return response()->json($processProductResult);
+        return response()->json($result);
     }
 }
