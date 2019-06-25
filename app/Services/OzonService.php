@@ -2308,10 +2308,15 @@ class OzonService
             }
             if (strtoupper($status) == strtoupper(config('app.order_ship_status'))) {
                 foreach ($toShipped as $key => $orderItemShipped) {
+                    $shippingProviderCode = config('app.russianpost_shipping_provider');
+                    if (boolval(preg_match('/^JNTCU(\d){10}YQ$/i', $orderItemShipped['trackingNumber']))) {
+                        $shippingProviderCode = config('app.jnet_shipping_provider');
+                    }
+
                     Log::info($this->interactionId . ' =>Ship ozon order:' . strval($order['ozon_order_id']));
                     $response = $this->sendData($this->shipOrderUrl, [
                         'order_id' => $order['ozon_order_id'],
-                        "shipping_provider_id" =>  config('app.russianpost_shipping_provider'),
+                        "shipping_provider_id" => $shippingProviderCode,
                         "tracking_number" => $orderItemShipped['trackingNumber'],
                         'items' => [[
                             'item_id' => $orderItemShipped['item_id'],
