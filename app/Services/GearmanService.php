@@ -48,7 +48,7 @@ class GearmanService
         Log::info('stocks_price gearmanWork:' . json_encode($json_data));
 
         $ozonService = new OzonService();
-        $sendStockResult = $ozonService->sendStockAndPriceForProduct($json_data);
+        $sendStockResult = $ozonService->sendStockAndPriceAndEnabledForProduct($json_data);
 
         if (isset($sendStockResult['result']) && !$sendStockResult['result']) {
             GearmanService::processRetry($json_data, $sendStockResult, $job);
