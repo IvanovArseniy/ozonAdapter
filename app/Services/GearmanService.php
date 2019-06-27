@@ -6,11 +6,11 @@ use DateTime;
 
 class GearmanService
 {
-    public static function addPriceAndStock($data)
+    public static function addUpdateProductNotification($data)
     {
         $client = new \GearmanClient();
         $client->addServers('localhost');
-        $client->doBackground('processStockAndPrice', json_encode($data));
+        $client->doBackground('updateProduct', json_encode($data));
     }
 
     public static function addOrderNotification($data)
@@ -27,12 +27,6 @@ class GearmanService
         $client->doBackground('processProductToOzon', json_encode($data));
     }
 
-    public static function addSetOzonIds($data) {
-        $client = new \GearmanClient();
-        $client->addServers('localhost');
-        $client->doBackground('setOzonIds', json_encode($data));
-    }
-
     public static function addSetOzonProductIdNotification($data)
     {
         $client = new \GearmanClient();
@@ -47,7 +41,7 @@ class GearmanService
         $client->doBackground('processForRetry', json_encode($data));
     }
 
-    public static function processStockAndPrice(\GearmanJob $job)
+    public static function updateProduct(\GearmanJob $job)
     {
         $data = $job->workload();
         $json_data = json_decode($data, true);
@@ -103,16 +97,14 @@ class GearmanService
         }
     }
 
-    public static function setOzonIds(\GearmanJob $job)
-    {
-        $data = $job->workload();
-        $json_data = json_decode($data, true);
-        // $ozonService = new OzonService();
-        // $ozonService->setOzonProductIdOld();
-    }
-
     public static function processRetry($json_data, $resultedData, $job)
     {
+        $function_name = $job->functionName();
+
+        if ($function_name == 'processStockAndPrice') {
+            $function_name = 'updateProduct';
+        }
+
         $try = 1;
         if (isset($json_data['try'])) {
             $try = $try + $json_data['try'];
@@ -123,7 +115,7 @@ class GearmanService
             ->insert(
                 [
                     'unique_key' => $job->unique(),
-                    'function_name' => $job->functionName(),
+                    'function_name' => $function_name,
                     'data' => json_encode($resultedData['data']),
                     'processing' => 0
                 ]
@@ -146,8 +138,8 @@ class GearmanService
                     $unique_key = $row->unique_key;
                     $function_name = $row->function_name;
                     $data = $row->data;
-                    if ($function_name == 'processStockAndPrice') {
-                        GearmanService::addPriceAndStock(json_decode($row->data));
+                    if ($function_name == 'updateProduct' || $function_name == 'processStockAndPrice') {
+                        GearmanService::addUpdateProductNotification(json_decode($row->data));
                     }
                     elseif ($function_name == 'processOrderNotification') {
                         GearmanService::addOrderNotification(json_decode($row->data));

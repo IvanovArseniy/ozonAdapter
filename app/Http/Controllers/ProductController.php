@@ -198,7 +198,7 @@ class ProductController extends BaseController
         return response()->json(['OK']);
     }
 
-    public function testMethod($test)
+    public function testMethod(Request $request)
     {
         $result = ['result' => 'OK'];
         // $ozonService = new OzonService();
@@ -210,8 +210,13 @@ class ProductController extends BaseController
         // $result = GearmanService::deleteRetryByQuery(11961681, "processStockAndPrice");
 
         //$resulr = boolval(preg_match('/^JNTCU(\d){10}YQ$/i', $test));
-        GearmanService::addProcessProductToOzonNotification(['mall_variant_id' => $variant['mallVariantId']]);
+        //GearmanService::addProcessProductToOzonNotification(['mall_variant_id' => $variant['mallVariantId']]);
+
+        $product = json_decode($request->getContent(), true);
+
+        $ozonService = new OzonService();
+        $processProductResult = $ozonService->sendStockAndPriceAndEnabledForProduct($product);        
         
-        return response()->json($result);
+        return response()->json($product);
     }
 }

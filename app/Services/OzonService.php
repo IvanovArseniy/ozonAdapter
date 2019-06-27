@@ -250,7 +250,7 @@ class OzonService
         return ['id' => $productId];
     }
 
-    protected function createVariants($variants, $productId)
+    protected function createVariants($variants, $productId, $enabled)
     {
         $insertedVariants = [];
         foreach ($variants as $key => $variant) {
@@ -276,17 +276,21 @@ class OzonService
                     ->where('mall_variant_id', $variant['mallVariantId'])
                     ->first();
                 if ($existedVariant) {
+                    $updatedFields = [
+                        'color' => $variant['color'],
+                        'size' => $variant['size'],
+                        'price' => $price,
+                        'inventory' => $quantity,
+                        'ozon_product_id' => null,
+                        'sent' => 0
+                    ];
+                    if (!is_null($enabled)) {
+                        $updatedFields['deleted'] = intval(!boolval($enabled));
+                    }
+
                     app('db')->connection('mysql')->table('product_variant')
                         ->where('mall_variant_id', $variant['mallVariantId'])
-                        ->update([
-                            'color' => $variant['color'],
-                            'size' => $variant['size'],
-                            'price' => $price,
-                            'inventory' => $quantity,
-                            'deleted' => 0,
-                            'ozon_product_id' => null,
-                            'sent' => 0
-                        ]);
+                        ->update($updatedFields);
 
                         array_push($insertedVariants, [
                             'product_variant_id' => $existedVariant->id,
@@ -295,17 +299,21 @@ class OzonService
                 }
                 else {
                     $pdo = app('db')->connection('mysql')->getPdo();
+                    $insertedFields = [
+                        'product_id' => $productId,
+                        'mall_variant_id' => $variant['mallVariantId'],
+                        'color' => $variant['color'],
+                        'size' => $variant['size'],
+                        'price' => $price,
+                        'inventory' => $variant['inventory'],
+                        'deleted' => 0,
+                        'sent' => 0
+                    ];
+                    if (!is_null($enabled)) {
+                        $insertedFields['deleted'] = intval(!boolval($enabled));
+                    }
                     $result = app('db')->connection('mysql')->table('product_variant')
-                        ->insert([
-                            'product_id' => $productId,
-                            'mall_variant_id' => $variant['mallVariantId'],
-                            'color' => $variant['color'],
-                            'size' => $variant['size'],
-                            'price' => $price,
-                            'inventory' => $variant['inventory'],
-                            'deleted' => 0,
-                            'sent' => 0
-                        ]);
+                        ->insert($insertedFields);
         
                     if ($result) {
                         $variantId = $pdo->lastInsertId();
@@ -459,9 +467,10 @@ class OzonService
             $message = ['product_id' => $ozonProduct['result']['id']];
             $message['quantity'] = $variant->inventory;
             $message['price'] = $variant->price;
+            $message['enabled'] = !boolval($variant->deleted);
             
             try {
-                GearmanService::addPriceAndStock($message);
+                GearmanService::addUpdateProductNotification($message);
             }
             catch (\Exception $e) {
                 Log::error('Adding order notification message to gearman queue failed!');
@@ -620,7 +629,7 @@ class OzonService
         ];
     }
 
-    public function sendStockAndPriceForProduct($product)
+    public function sendStockAndPriceAndEnabledForProduct($product)
     {
         if(!is_array($product)) $product = json_decode($product,true);
         if (!is_array($product)) {
@@ -633,6 +642,7 @@ class OzonService
         if (isset($ozonProductResult['result'])) {
             try {
                 GearmanService::deleteRetryByQuery($product['product_id'], "processStockAndPrice");
+                GearmanService::deleteRetryByQuery($product['product_id'], "updateProduct");
             }
             catch (\Exception $e) {
                 Log::error('deleteRetryByQuery to gearman queue failed!');
@@ -640,10 +650,18 @@ class OzonService
 
             $updateFields = [];
             $updateFields = ['sent_date' => date('Y-m-d\TH:i:s.u')];
-            $updateNeeded = false;
+            $enabled = null;
+            if (isset($product['enabled'])) {
+                $enabled = boolval($product['enabled']);
+                $updateFields['deleted'] = intval(!$enabled);
+            }
+            $ozonEnabled = boolval($ozonProductResult['result']['visibility_details']['active_product']);
+
+            if (!$ozonEnabled) {
+                $this->enableProduct(true, $product['product_id']);
+            }
 
             if (isset($product['price'])) {
-                $updateNeeded = true;
                 $updateFields['price'] = $product['price'];
                 $oldPrice = 0;
                 if (isset($ozonProductResult['result']['old_price'])) {
@@ -666,7 +684,6 @@ class OzonService
             }
 
             if (isset($product['quantity'])) {
-                $updateNeeded = true;
                 $updateFields['inventory'] = $product['quantity'];
                 $quantityResults = $this->setQuantity([
                     [
@@ -674,23 +691,32 @@ class OzonService
                         'stock' => $product['quantity']
                     ]
                 ]);
-                foreach ($quantityResults['result'] as $key => $quantityResult) {
-                    if (isset($quantityResult['updated']) && boolval($quantityResult['updated'])) {
-                        $this->enableProduct(boolval($ozonProductResult['result']['visibility_details']['active_product']), $quantityResult['product_id']);
-                        $quantitySuccess = true;
-                    }
+                if (isset($quantityResult['updated']) && boolval($quantityResult['updated'])) {
+                    $quantitySuccess = true;
                 }
             }
 
-            if ($updateNeeded && count($updateFields) > 0) {
-                app('db')->connection('mysql')->table('product_variant')
-                    ->where('deleted', 0)
-                    ->where('ozon_product_id', $ozonProductResult['result']['id'])
-                    ->update($updateFields);
+            if (!is_null($enabled)) {
+                if (!$enabled) {
+                    $this->enableProduct($enabled, $product['product_id']);
+                }
             }
+            else {
+                if (!$ozonEnabled) {
+                    $this->enableProduct($ozonEnabled, $product['product_id']);
+                }
+            }
+
+            app('db')->connection('mysql')->table('product_variant')
+                ->where('deleted', 0)
+                ->where('ozon_product_id', $ozonProductResult['result']['id'])
+                ->update($updateFields);
         }
 
-        $data = ['product_id' => $product['product_id']];
+        $data = [
+            'product_id' => $product['product_id'],
+            'enabled' => $product['enabled']
+        ];
         if (!$quantitySuccess && isset($product['quantity'])) {
             $data['quantity'] = $product['quantity'];
         }
@@ -708,60 +734,6 @@ class OzonService
             'result' => $priceSuccess && $quantitySuccess,
             'data' => $data
         ];
-    }
-
-    public function setOzonProductIdOld()
-    {
-        try {
-            $variants = app('db')->connection('mysql')->table('product_variant')
-            ->whereNull('ozon_product_id')
-            ->where('deleted', 0)
-            ->orderBy('sent_date','asc')
-            ->take(20)
-            ->get();
-
-            $errors = [];
-            foreach ($variants as $key => $variant) {
-                $response = $this->getProductFromOzonByOfferId($variant->mall_variant_id);
-                $ozonProduct = json_decode($response, true);
-                $updateFields = [];
-                if(isset($ozonProduct['result'])) {
-                    $updateFields = ['ozon_product_id' => $ozonProduct['result']['id']];
-                    $message = ['product_id' => $ozonProduct['result']['id']];
-                    $message['quantity'] = $variant->inventory;
-                    $message['price'] = $variant->price;
-
-                    app('db')->connection('mysql')->table('product_variant')
-                    ->where('id', $variant->id)
-                    ->update($updateFields);
-            
-                    try {
-                        GearmanService::addPriceAndStock($message);
-                    }
-                    catch (\Exception $e) {
-                        Log::error('Adding message to gearman queue failed!');
-                    }
-                }
-                else {
-                    $errors[$variant->product_id] = 'Product with id=' . $variant->product_id . ' not created yet in ozon';
-                    $updateFields = ['sent_date' => date('Y-m-d\TH:i:s.u')];
-                    app('db')->connection('mysql')->table('product_variant')
-                    ->where('id', $variant->id)
-                    ->update($updateFields);
-                }
-            }
-        }
-        catch (\Exception $e) {
-        }        
-
-        try {
-            GearmanService::addSetOzonIds(['repeat' => 'always']);
-        }
-        catch (\Exception $e) {
-            Log::error('Adding order notification message to gearman queue failed!');
-        }
-
-        return array_values($errors);
     }
 
     protected function sendProductsToOzon($items) {
@@ -965,7 +937,6 @@ class OzonService
     protected function getOzonProductId($productId, $mallVariantId)
     {
         $productVariant = app('db')->connection('mysql')->table('product_variant')
-            ->where('deleted', 0)
             ->where('product_id', $productId)
             ->where('mall_variant_id', $mallVariantId)
             ->first();
@@ -1251,46 +1222,6 @@ class OzonService
                     $result = json_decode($response, true);
                 }
     
-                if (isset($product['price'])) {
-                    $oldPrice = 0;
-                    if (isset($ozonProductResult['result']['old_price'])) {
-                        $oldPrice = floatval($ozonProductResult['result']['old_price']);
-                    }
-                    $price = floatval($product['price']);
-                    if ($price < $oldPrice) {
-                        $priceData = [
-                            'product_id' => $ozonProductResult['result']['id'],
-                            'price' => strval($product['price']),
-                            'old_price' => strval($ozonProductResult['result']['old_price']),
-                            'vat' => "0"
-                        ];
-                    }
-                    else {
-                        $priceData = [
-                            'product_id' => $ozonProductResult['result']['id'],
-                            'price' => strval($product['price']),
-                            'vat' => "0"
-                        ];
-                    }
-
-                    // $priceResult = $this->setPrices($priceData);
-                    // $updateFields['price'] = $product['price'];
-                    // $updateNeeded = true;
-                }
-    
-                if (isset($product['enabled'])) {
-                    $activateResponse = $this->enableProduct($product['enabled'], $ozonProductResult['result']['id']);
-        
-                    if(isset($activateResponse['result']) && strtolower(isset($activateResponse['result'])) == strtolower('success')) {
-                        app('db')->connection('mysql')->table('product')
-                            ->where('id', $productId)
-                            ->update(['enabled' => $product['enabled']]);
-                    }
-                }
-                else {
-                    $this->enableProduct(boolval($ozonProductResult['result']['visibility_details']['active_product']), $ozonProductResult['result']['id']);
-                }
-    
                 if ($updateNeeded && count($updateFields) > 0) {
                     app('db')->connection('mysql')->table('product_variant')
                         ->where('deleted', 0)
@@ -1313,14 +1244,16 @@ class OzonService
             if (isset($product['quantity'])) {
                 $message['quantity'] = $product['quantity'];
             }
-    
             if (isset($product['price'])) {
                 $message['price'] = $product['price'];
+            }
+            if (isset($product['enabled'])) {
+                $message['enabled'] = $product['enabled'];
             }
     
             if (isset($message['quantity']) || isset($message['price'])) {
                 try {
-                    GearmanService::addPriceAndStock($message);
+                    GearmanService::addUpdateProductNotification($message);
                 }
                 catch (\Exception $e) {
                     Log::error('Adding message to gearman queue failed!');
