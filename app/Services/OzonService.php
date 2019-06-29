@@ -2291,6 +2291,9 @@ class OzonService
                     if (boolval(preg_match('/^JNTCU(\d){10}YQ$/i', $orderItemShipped['trackingNumber']))) {
                         $shippingProviderCode = config('app.jnet_shipping_provider');
                     }
+                    if (boolval(preg_match('/^PE(\.){7}CRU$/i', $orderItemShipped['trackingNumber']))) {
+                        $shippingProviderCode = config('app.ponyexpress_shipping_provider');
+                    }
 
                     Log::info($this->interactionId . ' =>Ship ozon order:' . strval($order['ozon_order_id']));
                     $response = $this->sendData($this->shipOrderUrl, [

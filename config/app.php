@@ -46,6 +46,7 @@ return [
     'order_cancel_reason' => 358,
     'russianpost_shipping_provider' => 15406651969000,
     'jnet_shipping_provider' => 15543206563000,
+    'ponyexpress_shipping_provider' => 15782513276000,
     'order_status' => [
         'AWAITING_APPROVE' => 'AWAITING_PROCESSING',
         'AWAITING_PACKAGING' => 'PROCESSING', 
