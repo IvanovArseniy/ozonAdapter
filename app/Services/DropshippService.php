@@ -218,6 +218,16 @@ class DropshippService
     public function ApproveOrder($orderNr)
     {
         Log::info('Approve order:' . json_encode($orderNr));
+
+        $ozonService = new OzonService();
+        $orderInfo = $ozonService->getOrderInfoCommon($orderNr);
+        if (!is_null($orderInfo) && !isset($orderInfo['error']) && !isset($orderInfo['errorCode']) && isset($orderInfo['fulfillmentStatus'])) {
+            if ($orderInfo['fulfillmentStatus'] == config('app.order_status.CANCELLED')) {
+                return $this->DeclineOrder($orderNr);
+            }
+        }
+        else return ['error' => true];
+
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace(['{store_num}','{action}'], [$orderNr, 'approve'], $this->orderUrlAction)));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
