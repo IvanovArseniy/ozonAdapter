@@ -17,7 +17,7 @@ class GearmanService
     {
         $client = new \GearmanClient();
         $client->addServers('localhost');
-        $client->doBackground('processOrderNotification', json_encode($data));
+        $client->doHighBackground('processOrderNotification', json_encode($data));
     }
 
     public static function addProcessProductToOzonNotification($data)
