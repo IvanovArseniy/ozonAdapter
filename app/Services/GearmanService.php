@@ -101,10 +101,6 @@ class GearmanService
     {
         $function_name = $job->functionName();
 
-        if ($function_name == 'processStockAndPrice') {
-            $function_name = 'updateProduct';
-        }
-
         $try = 1;
         if (isset($json_data['try'])) {
             $try = $try + $json_data['try'];
@@ -117,7 +113,10 @@ class GearmanService
                     'unique_key' => $job->unique(),
                     'function_name' => $function_name,
                     'data' => json_encode($resultedData['data']),
-                    'processing' => 0
+                    'processing' => 0,
+                    'ignored' => (isset($resultedData['ignored']) && $try > 1) ? intval($resultedData['ignored']) : 0,
+                    'reason' => isset($resultedData['reason']) ? $resultedData['reason'] : null,
+                    'sent_date' => date('Y-m-d\TH:i:s.u')
                 ]
             );
         }
@@ -128,6 +127,8 @@ class GearmanService
         $success = false;
         try {
             app('db')->connection('mysql')->table('gearman_retry_queue')
+                ->where('ignored', 0)
+                ->orWhereNull('ignored')
                 ->update(['processing' => 1]);
 
             $res = app('db')->connection('mysql')->table('gearman_retry_queue')
@@ -171,6 +172,14 @@ class GearmanService
             ->where('data', 'LIKE', '%"product_id":' . $key . '%')
             ->where('function_name', $function_name)
             ->where('processing', 0)
+            ->where('ignored', 0)
+            ->delete();
+
+        app('db')->connection('mysql')->table('gearman_retry_queue')
+            ->where('data', 'LIKE', '%"product_id":' . $key . '%')
+            ->where('function_name', $function_name)
+            ->where('processing', 0)
+            ->whereNull('ignored')
             ->delete();
    }
 }
