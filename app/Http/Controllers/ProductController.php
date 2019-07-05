@@ -200,23 +200,34 @@ class ProductController extends BaseController
 
     public function testMethod(Request $request)
     {
-        $result = ['result' => 'OK'];
-        // $ozonService = new OzonService();
-        // $processProductResult = $ozonService->processProductToOzon(['mall_variant_id' => '8f350454-54b7-45fb-ae95-6c3834bf4281']);
+        // $result = ['result' => 'OK'];
+        // // $ozonService = new OzonService();
+        // // $processProductResult = $ozonService->processProductToOzon(['mall_variant_id' => '8f350454-54b7-45fb-ae95-6c3834bf4281']);
 
-        // $dropshippService = new DropshippService();
-        // $result = $dropshippService->test();
+        // // $dropshippService = new DropshippService();
+        // // $result = $dropshippService->test();
 
-        // $result = GearmanService::deleteRetryByQuery(11961681, "processStockAndPrice");
+        //  $result = GearmanService::processForRetry(new \GearmanJob);
 
-        //$resulr = boolval(preg_match('/^JNTCU(\d){10}YQ$/i', $test));
-        //GearmanService::addProcessProductToOzonNotification(['mall_variant_id' => $variant['mallVariantId']]);
+        // //$resulr = boolval(preg_match('/^JNTCU(\d){10}YQ$/i', $test));
+        // //GearmanService::addProcessProductToOzonNotification(['mall_variant_id' => $variant['mallVariantId']]);
 
-        $product = json_decode($request->getContent(), true);
+        // // $product = json_decode($request->getContent(), true);
 
-        $ozonService = new OzonService();
-        $processProductResult = $ozonService->sendStockAndPriceAndEnabledForProduct($product);        
+        // // $ozonService = new OzonService();
+        // // $processProductResult = $ozonService->sendStockAndPriceAndEnabledForProduct($product);        
         
-        return response()->json($product);
+ 
+        $timerStart = $milliseconds = round(microtime(true) * 1000);
+        sleep(5);
+        $timerEnd = $milliseconds = round(microtime(true) * 1000);
+        $t = ($timerEnd - $timerStart);
+
+
+        $result = [
+            'timer1' => $t
+        ];
+
+        return response()->json($result);
     }
 }

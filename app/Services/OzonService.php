@@ -245,7 +245,7 @@ class OzonService
         }
 
 
-        $variantIds = $this->createVariants($product['variants'], $productId);
+        $variantIds = $this->createVariants($product['variants'], $productId, isset($product['enabled']) ? $product['enabled'] : null);
 
         return ['id' => $productId];
     }
@@ -644,6 +644,10 @@ class OzonService
 
     public function sendStockAndPriceAndEnabledForProduct($product)
     {
+        $timerTotalStart = $milliseconds = round(microtime(true) * 1000);	
+        $timerStart = $milliseconds = round(microtime(true) * 1000);
+        $ignored = false;
+        $reason = null;
         if(!is_array($product)) $product = json_decode($product,true);
         if (!is_array($product)) {
             return false;
@@ -651,16 +655,11 @@ class OzonService
         $ozonProductResult = $this->getProductInfo($product['product_id']);
         $priceSuccess = false;
         $quantitySuccess = false;
+        $timerEnd = $milliseconds = round(microtime(true) * 1000);
+        Log::debug($this->interactionId . ' => sendStockAndPriceAndEnabledForProduct: getProductInfo operation:' . ($timerEnd - $timerStart));
 
         if (isset($ozonProductResult['result'])) {
-            try {
-                GearmanService::deleteRetryByQuery($product['product_id'], "processStockAndPrice");
-                GearmanService::deleteRetryByQuery($product['product_id'], "updateProduct");
-            }
-            catch (\Exception $e) {
-                Log::error('deleteRetryByQuery to gearman queue failed!');
-            }
-
+            $timerStart = $milliseconds = round(microtime(true) * 1000);
             $updateFields = [];
             $updateFields = ['sent_date' => date('Y-m-d\TH:i:s.u')];
             $enabled = null;
@@ -673,7 +672,10 @@ class OzonService
             if (!$ozonEnabled) {
                 $this->enableProduct(true, $product['product_id']);
             }
+            $timerEnd = $milliseconds = round(microtime(true) * 1000);
+            Log::debug($this->interactionId . ' => sendStockAndPriceAndEnabledForProduct: enable before apdate operation:' . ($timerEnd - $timerStart));
 
+            $timerStart = $milliseconds = round(microtime(true) * 1000);
             if (isset($product['price'])) {
                 $updateFields['price'] = $product['price'];
                 $oldPrice = 0;
@@ -695,7 +697,10 @@ class OzonService
                     $priceSuccess = true;
                 }
             }
+            $timerEnd = $milliseconds = round(microtime(true) * 1000);
+            Log::debug($this->interactionId . ' => sendStockAndPriceAndEnabledForProduct: set price operation:' . ($timerEnd - $timerStart));
 
+            $timerStart = $milliseconds = round(microtime(true) * 1000);
             if (isset($product['quantity'])) {
                 $updateFields['inventory'] = $product['quantity'];
                 $quantityResults = $this->setQuantity([
@@ -704,11 +709,21 @@ class OzonService
                         'stock' => $product['quantity']
                     ]
                 ]);
-                if (isset($quantityResult['updated']) && boolval($quantityResult['updated'])) {
+                
+                if (isset($quantityResults['result']) && isset($quantityResults['result'][0]['updated']) && boolval($quantityResults['result'][0]['updated'])) {
                     $quantitySuccess = true;
                 }
-            }
 
+                if (isset($quantityResults['result']) && isset($quantityResults['result'][0]['updated']) && !boolval($quantityResults['result'][0]['updated'])
+                && isset($quantityResults['result'][0]['errors']) && count($quantityResults['result'][0]['errors']) > 0) {
+                    $ignored = true;
+                    $reason = json_encode($quantityResults['result'][0]);
+                }
+            }
+            $timerEnd = $milliseconds = round(microtime(true) * 1000);
+            Log::debug($this->interactionId . ' => sendStockAndPriceAndEnabledForProduct: set stock operation:' . ($timerEnd - $timerStart));
+
+            $timerStart = $milliseconds = round(microtime(true) * 1000);
             if (!is_null($enabled)) {
                 if (!$enabled) {
                     $this->enableProduct($enabled, $product['product_id']);
@@ -719,13 +734,19 @@ class OzonService
                     $this->enableProduct($ozonEnabled, $product['product_id']);
                 }
             }
+            $timerEnd = $milliseconds = round(microtime(true) * 1000);
+            Log::debug($this->interactionId . ' => sendStockAndPriceAndEnabledForProduct: enable after apdate operation:' . ($timerEnd - $timerStart));
 
+            $timerStart = $milliseconds = round(microtime(true) * 1000);
             app('db')->connection('mysql')->table('product_variant')
                 ->where('deleted', 0)
                 ->where('ozon_product_id', $ozonProductResult['result']['id'])
                 ->update($updateFields);
+            $timerEnd = $milliseconds = round(microtime(true) * 1000);
+            Log::debug($this->interactionId . ' => sendStockAndPriceAndEnabledForProduct: update db operation:' . ($timerEnd - $timerStart));
         }
 
+        $timerStart = $milliseconds = round(microtime(true) * 1000);
         $data = [
             'product_id' => $product['product_id']
         ];
@@ -744,13 +765,20 @@ class OzonService
         }
         elseif (!isset($product['price'])) {
             $priceSuccess = true;
-        }        
+        }     
+        $timerEnd = $milliseconds = round(microtime(true) * 1000);
+        Log::debug($this->interactionId . ' => sendStockAndPriceAndEnabledForProduct: generate response operation:' . ($timerEnd - $timerStart));   
 
+        $timerTotalEnd = $milliseconds = round(microtime(true) * 1000);
+        Log::debug($this->interactionId . ' => sendStockAndPriceAndEnabledForProduct: Total:' . ($timerTotalEnd - $timerTotalStart )); 
         return [
             'result' => $priceSuccess && $quantitySuccess,
-            'data' => $data
+            'data' => $data,
+            'ignored' => $ignored,
+            'reason' => $reason
         ];
     }
+
 
     protected function sendProductsToOzon($items) {
         Log::info($this->interactionId . ' => Import product request to ozon:' . json_encode(['items' => $items], JSON_UNESCAPED_UNICODE));
@@ -938,7 +966,7 @@ class OzonService
         $product = app('db')->connection('mysql')->table('product')
             ->where('id', $productId)->first();
         if (!is_null($product)) {
-            $variantIds = $this->createVariants($combinations, $productId);
+            $variantIds = $this->createVariants($combinations, $productId, null);
             $result = [];
             foreach ($variantIds as $key => $variant) {
                 $result[$variant['product_variant_id']] = $variant['mall_variant_id'];
@@ -1119,7 +1147,7 @@ class OzonService
         }
 
         if (count($newVariants) > 0) {
-            $variantIds = $this->createVariants($newVariants, $productId);
+            $variantIds = $this->createVariants($newVariants, $productId, isset($product['enabled']) ? $product['enabled'] : null);
             $imageUrl = app('db')->connection('mysql')->select('
                 select i.image_url as imageUrl from product_variant pv
                     left join product_variant_image pvi on pv.id = pvi.product_variant_id
@@ -1267,7 +1295,7 @@ class OzonService
                 $message['enabled'] = $product['enabled'];
             }
     
-            if (isset($message['quantity']) || isset($message['price'])) {
+            if (isset($message['quantity']) || isset($message['price']) || isset($message['enabled'])) {
                 try {
                     GearmanService::addUpdateProductNotification($message);
                 }
