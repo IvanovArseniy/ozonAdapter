@@ -186,19 +186,23 @@ class OzonService
             ];
         }
 
-        if (!isset($product['description']) || is_null($product['description'])) {
-            return [
-                "errorCode" => "EMPTY_DESCRIPTION",
-                'errorMessage' => 'Description is empty!'
-            ];
+        if (boolval(config('app.enable_product_creation'))) {
+            if (!isset($product['description']) || is_null($product['description'])) {
+                return [
+                    "errorCode" => "EMPTY_DESCRIPTION",
+                    'errorMessage' => 'Description is empty!'
+                ];
+            }
         }
 
-        $categoryResult = $this->getOzonCategory($product['mallCategoryId'], $product['mallCategoryName']);
-        if (isset($categoryResult['error'])) {
-            return [
-                "errorCode" => "CATEGORY_NOT_MAPPED",
-                'errorMessage' => $categoryResult['error']
-            ];
+        if (boolval(config('app.enable_product_creation'))) {
+            $categoryResult = $this->getOzonCategory($product['mallCategoryId'], $product['mallCategoryName']);
+            if (isset($categoryResult['error'])) {
+                return [
+                    "errorCode" => "CATEGORY_NOT_MAPPED",
+                    'errorMessage' => $categoryResult['error']
+                ];
+            }
         }
 
         $checkShippingResult = $this->checkShipping($product);
@@ -376,9 +380,9 @@ class OzonService
             if (!is_null($variants) && count($variants) > 0) {
                 $variant = $variants[0];
                 if (!is_null($variant->imageUrl)) {
-                    Log::info('Main image for variant:' . json_encode($variant->imageUrl));
+                    Log::debug('Main image for variant:' . json_encode($variant->imageUrl));
                     $categoryResult = $this->getOzonCategory($variant->mallCategoryId, $variant->mallCategoryName);
-                    Log::info('Category search result:' . json_encode($categoryResult));
+                    Log::debug('Category search result:' . json_encode($categoryResult));
                     if (!isset($categoryResult['error']) && !is_null($categoryResult['categoryId'])) {
                         $item = $this->addProductToRequest(
                             $variant->mallVariantId,
@@ -405,7 +409,7 @@ class OzonService
                     }
                 }
                 else {
-                    Log::info('No main image for variant:' . json_encode($variant->mallVariantId));
+                    Log::debug('No main image for variant:' . json_encode($variant->mallVariantId));
                 }
             }
         }
@@ -882,7 +886,7 @@ class OzonService
                             'create_date' => date('Y-m-d\TH:i:s.u')
                         ]);
                     $error = 'Category with mallCategoryId=' . $mallCategoryId . ' does not mapped!';
-                    Log::info($error);
+                    Log::debug($error);
                 }
                 catch (\Exception $e) {
                     $error = 'Category with mallCategoryId=' . $mallCategoryId . ' does not mapped!';
@@ -1199,6 +1203,17 @@ class OzonService
     protected function updateOzonProduct($product, $productId, $mallVariantId)
     {
         $productVariant = $this->getOzonProductId($productId, $mallVariantId);
+
+        if (is_null($productVariant['ozonProductId'])) {
+            $byofferResponse = $this->getProductFromOzonByOfferId($mallVariantId);
+            $byofferResult = json_decode($byofferResponse, true);
+            if (isset($byofferResult['result'])) {
+                app('db')->connection('mysql')->table('product_variant')
+                    ->where('mall_variant_id', $mallVariantId)
+                    ->update(['ozon_product_id' => $byofferResult['result']['id']]);
+            }
+        }
+
         if ($productVariant['Success'] && !is_null($productVariant['ozonProductId'])) {
             $ozonProductResult = $this->getProductInfo($productVariant['ozonProductId']);
             if (isset($ozonProductResult['result'])) {
@@ -1259,10 +1274,10 @@ class OzonService
                 }
     
                 if ($updateNeeded) {
-                    Log::info($this->interactionId . ' => Update product request to ozon:' . json_encode($request, JSON_UNESCAPED_UNICODE));
+                    Log::debug($this->interactionId . ' => Update product request to ozon:' . json_encode($request, JSON_UNESCAPED_UNICODE));
                     $response = $this->sendData($this->updateProductUrl, $request);
                     $response = $response['response'];
-                    Log::info($this->interactionId . ' => Update product response: ' . $response);
+                    Log::debug($this->interactionId . ' => Update product response: ' . $response);
                     $result = json_decode($response, true);
                 }
     
@@ -1361,7 +1376,10 @@ class OzonService
 
     public function addMainImage($productId, $imageUrl)
     {
+        $timerStart = $milliseconds = round(microtime(true) * 1000);
         $productVariants = $this->getProductVariants($productId);
+        $timerEnd = $milliseconds = round(microtime(true) * 1000);
+        Log::debug($this->interactionId . ' => addMainImage: get product variants operation:' . ($timerEnd - $timerStart));
         if (!is_null($productVariants) && count($productVariants) > 0) {
             $newImage = [
                 'is_default' => true,
@@ -1369,11 +1387,14 @@ class OzonService
                 'deleted' => 0
             ];
 
+            $timerStart = $milliseconds = round(microtime(true) * 1000);
             $firstProductVariantId = $productVariants[0]->id;
             $imagesResult = $this->compareImages(
                 [$newImage],
                 $firstProductVariantId
             );
+            $timerEnd = $milliseconds = round(microtime(true) * 1000);
+            Log::debug($this->interactionId . ' => addMainImage: compare images operation: ' . ($timerEnd - $timerStart));
 
             $relations = [];
             foreach ($productVariants as $key => $variant) {
@@ -1384,7 +1405,10 @@ class OzonService
                     ]);
                 }
                 if (!is_null($variant->ozonProductId)) {
+                    $timerStart = $milliseconds = round(microtime(true) * 1000);
                     $updateResult = $this->updateOzonProduct(['images' => $imagesResult['images']], $productId, $variant->mallVariantId);
+                    $timerEnd = $milliseconds = round(microtime(true) * 1000);
+                    Log::debug($this->interactionId . ' => addMainImage: update product operation: variant: ' . $variant->mallVariantId . '---:' . ($timerEnd - $timerStart));
                 }
             }
 
@@ -1404,10 +1428,14 @@ class OzonService
 
     public function addGalleryImage($productId, $image)
     {
+        $timerStart = $milliseconds = round(microtime(true) * 1000);
         $imagesResult = [];
         $productVariants = $this->getProductVariants($productId);
+        $timerEnd = $milliseconds = round(microtime(true) * 1000);
+        Log::debug($this->interactionId . ' => addGalleryImage: get product variants operation:' . ($timerEnd - $timerStart));
         if (!is_null($productVariants) && count($productVariants) > 0) {
             foreach ($productVariants as $key => $variant) {
+                $timerStart = $milliseconds = round(microtime(true) * 1000);
                 $imagesResult = $this->compareImages([
                     [
                         'is_default' => false,
@@ -1416,7 +1444,12 @@ class OzonService
                     ]],
                     $variant->id
                 );
+                $timerEnd = $milliseconds = round(microtime(true) * 1000);
+                Log::debug($this->interactionId . ' => addGalleryImage: compare images operation: variant: ' . $variant->mallVariantId . '---:' . ($timerEnd - $timerStart));
+                $timerEnd = $milliseconds = round(microtime(true) * 1000);
                 $result = $this->updateOzonProduct(['images' => $imagesResult['images']],$productId, $variant->mallVariantId);
+                $timerEnd = $milliseconds = round(microtime(true) * 1000);
+                Log::debug($this->interactionId . ' => addGalleryImage: update product operation: variant: ' . $variant->mallVariantId . '---:' . ($timerEnd - $timerStart));
             }
             return $imagesResult['imageIds'];
         }
@@ -1442,6 +1475,7 @@ class OzonService
 
     public function addGalleryImageForCombination($productId, $mallVariantId, $image)
     {
+        $timerStart = $milliseconds = round(microtime(true) * 1000);
         $result = [];
         $productVariants = app('db')->connection('mysql')->table('product_variant')
             ->where('product_id', $productId)
@@ -1449,7 +1483,10 @@ class OzonService
             ->where('deleted', 0)
             ->select('ozon_product_id as ozonProductId', 'mall_variant_id as mallVariantId', 'id')
             ->get();
+            $timerEnd = $milliseconds = round(microtime(true) * 1000);
+            Log::debug($this->interactionId . ' => addGalleryImageForCombination: get product variants operation:' . ($timerEnd - $timerStart));
         if (!is_null($productVariants) && count($productVariants) > 0) {
+            $timerStart = $milliseconds = round(microtime(true) * 1000);
             $imagesResult = $this->compareImages([
                 [
                     'is_default' => true,
@@ -1458,8 +1495,13 @@ class OzonService
                 ]],
                 $variant[0]->id
             );
+            $timerEnd = $milliseconds = round(microtime(true) * 1000);
+            Log::debug($this->interactionId . ' => addGalleryImageForCombination: compare images operation:' . ($timerEnd - $timerStart));
+            $timerStart = $milliseconds = round(microtime(true) * 1000);
             $updateResult = $this->updateOzonProduct(['images' => $imagesResult['images']], $productId, $mallVariantId);
             array_push($result, $imagesResult['imageIds']);
+            $timerEnd = $milliseconds = round(microtime(true) * 1000);
+            Log::debug($this->interactionId . ' => addGalleryImageForCombination: update product operation:' . ($timerEnd - $timerStart));
         }
         return $result;
     }
@@ -1906,7 +1948,7 @@ class OzonService
             'delivery_schema' => 'crossborder'
         ];
 
-        Log::info($this->interactionId . ' => Get orders from ozon:' . json_encode($data, JSON_UNESCAPED_UNICODE));
+        Log::debug($this->interactionId . ' => Get orders from ozon:' . json_encode($data, JSON_UNESCAPED_UNICODE));
         $response = $this->sendData($this->orderListUrl, $data);
         $response = $response['response'];
         Log::info($this->interactionId . ' => Ozon order info: ' . $response);
@@ -2323,7 +2365,7 @@ class OzonService
                         $shippingProviderCode = config('app.ponyexpress_shipping_provider');
                     }
 
-                    Log::info($this->interactionId . ' =>Ship ozon order:' . strval($order['ozon_order_id']));
+                    Log::info($this->interactionId . ' => Ship ozon order:' . strval($order['ozon_order_id']));
                     $response = $this->sendData($this->shipOrderUrl, [
                         'order_id' => $order['ozon_order_id'],
                         "shipping_provider_id" => $shippingProviderCode,
@@ -2369,8 +2411,7 @@ class OzonService
         if ($orders) {
             foreach ($orders as $key => $order) {
                 $orderInfo = $this->getOrderInfo($order->ozon_order_id);
-                Log::info(json_encode($orderInfo, JSON_UNESCAPED_UNICODE));
-                Log::info(json_encode($orderInfo, JSON_UNESCAPED_UNICODE));
+                Log::debug(json_encode($orderInfo, JSON_UNESCAPED_UNICODE));
                 if (!is_null($orderInfo) && !isset($orderInfo['error']) && !isset($orderInfo['errorCode'])) {
                     $orders = app('db')->connection('mysql')->table('orders')
                         ->where('id', $order->id)
@@ -2519,14 +2560,14 @@ class OzonService
             curl_setopt($ch, CURLOPT_POSTFIELDS, $data_string);
         }
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        Log::info($this->interactionId . ' => Url: ' . $this->baseUrl . $url);
-        Log::info($this->interactionId . ' => Data: ' . json_encode($data, JSON_UNESCAPED_UNICODE));
+        Log::debug($this->interactionId . ' => Url: ' . $this->baseUrl . $url);
+        Log::debug($this->interactionId . ' => Data: ' . json_encode($data, JSON_UNESCAPED_UNICODE));
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        Log::info('Response http code:' . $http_code);
-        Log::info('Response data:' . json_encode($response));
+        Log::debug('Response http code:' . $http_code);
+        Log::debug('Response data:' . json_encode($response));
         
         return [
             'http_code' => $http_code,
