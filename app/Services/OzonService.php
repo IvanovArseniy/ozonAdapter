@@ -30,7 +30,7 @@ class OzonService
 
     protected $attributes;
 
-    protected $interaction;
+    protected $interactionId;
 
     public function __construct() {
         $this->baseUrl = config('app.ozon_base_url');
@@ -2207,6 +2207,7 @@ class OzonService
             'refererUrl' => 'http://ozon.ru/',
             'createDate' => $date->format('Y-m-d H:i:s'),
             'approveAt' => $date_approve_at->format('Y-m-d H:i:s'),
+            'customerId' => $order['customer_id'],
             'shippingPerson' => [
                 'name' => $order['address']['addressee'],
                 'phone' => $order['address']['phone'],
