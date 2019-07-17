@@ -14,6 +14,8 @@ class DropshippService
 
     protected $updateProductUrl;
     protected $deleteProductUrl;
+    
+    protected $interactionId;
 
     public function __construct() {
         $this->baseUrl = config('app.dropshipp_base_url');
@@ -22,6 +24,12 @@ class DropshippService
         $this->orderUrlAction = config('app.dropshipp_order_url_action');
         $this->setOrderStatusUrl = '';
         $this->updateProductUrl = config('app.dropshipp_updateproduct_url');
+
+        $this->interactionId = uniqid();
+    }
+
+    public function getInteractionId() {
+        return $this->interactionId;
     }
 
     protected function addToken($url)
@@ -170,25 +178,25 @@ class DropshippService
         curl_setopt($ch, CURLOPT_POSTFIELDS, $data);  
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
-        Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl)));
+        Log::info($this->interactionId . ' => Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl)));
         $response = curl_exec($ch);
         curl_close($ch);
-        Log::info('Update order: ' . $response);
+        Log::info($this->interactionId . ' => Update order: ' . $response);
         return json_decode($response, true);
     }
 
     protected function notifyNewOrder($orderNr)
     {
-        Log::info('New order:' . json_encode($orderNr));
+        Log::info($this->interactionId . ' => New order:' . json_encode($orderNr));
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl)));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-        Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl)));
+        Log::info($this->interactionId . ' => Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl)));
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        Log::info('Notify new order: ' . $response);
+        Log::info($this->interactionId . ' => Notify new order: ' . $response);
 
         $response = json_decode($response, true);
 
@@ -203,21 +211,21 @@ class DropshippService
 
     protected function notifyDeletedOrder($orderNr)
     {
-        Log::info('Deleted order:' . json_encode($orderNr));
+        Log::info($this->interactionId . ' => Deleted order:' . json_encode($orderNr));
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl)));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
-        Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl)));
+        Log::info($this->interactionId . ' => Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl)));
         $response = curl_exec($ch);
         curl_close($ch);
-        Log::info('Notify deleted order: ' . $response);
+        Log::info($this->interactionId . ' => Notify deleted order: ' . $response);
         return json_decode($response, true);
     }
 
     public function ApproveOrder($orderNr)
     {
-        Log::info('Approve order:' . json_encode($orderNr));
+        Log::info($this->interactionId . ' => Approve order:' . json_encode($orderNr));
 
         $ozonService = new OzonService();
         $orderInfo = $ozonService->getOrderInfoCommon($orderNr);
@@ -232,24 +240,24 @@ class DropshippService
         curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace(['{store_num}','{action}'], [$orderNr, 'approve'], $this->orderUrlAction)));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-        Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl) . '/approve'));
+        Log::info($this->interactionId . ' => Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl) . '/approve'));
         $response = curl_exec($ch);
         curl_close($ch);
-        Log::info('Approve new order: ' . $response);
+        Log::info($this->interactionId . ' => Approve new order: ' . $response);
         return json_decode($response, true);
     }
 
     public function DeclineOrder($orderNr)
     {
-        Log::info('Decline order:' . json_encode($orderNr));
+        Log::info($this->interactionId . ' => Decline order:' . json_encode($orderNr));
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace(['{store_num}','{action}'], [$orderNr, 'decline'], $this->orderUrlAction)));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-        Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl) . '/decline'));
+        Log::info($this->interactionId . ' => Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl) . '/decline'));
         $response = curl_exec($ch);
         curl_close($ch);
-        Log::info('Decline new order: ' . $response);
+        Log::info($this->interactionId . ' => Decline new order: ' . $response);
         return json_decode($response, true);
     }
 
@@ -295,7 +303,7 @@ class DropshippService
 
     protected function updateProduct($productId, $data)
     {
-        Log::info('Update product:' . $productId . '=>' . $data);
+        Log::info($this->interactionId . ' => Update product:' . $productId . '=>' . $data);
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{product_id}', $productId, $this->updateProductUrl)));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -303,34 +311,24 @@ class DropshippService
         $headers = ['Content-Type: application/json', 'Content-Length: ' . strlen($data)];
         curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{product_id}', $productId, $this->updateProductUrl)));
+        Log::info($this->interactionId . ' => Url: ' . $this->baseUrl . $this->addToken(str_replace('{product_id}', $productId, $this->updateProductUrl)));
         $response = curl_exec($ch);
         curl_close($ch);
-        Log::info('Update product result: ' . $response);
+        Log::info($this->interactionId . ' => Update product result: ' . $response);
         return json_decode($response, true);
     }
 
     protected function deleteProduct($productId)
     {
-        Log::info('Deleted product:' . $productId);
+        Log::info($this->interactionId . ' => Deleted product:' . $productId);
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{product_id}', $productId, $this->updateProductUrl)));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
-        Log::info('Url: ' . $this->baseUrl . $this->addToken(str_replace('{product_id}', $productId, $this->updateProductUrl)));
+        Log::info($this->interactionId . ' => Url: ' . $this->baseUrl . $this->addToken(str_replace('{product_id}', $productId, $this->updateProductUrl)));
         $response = curl_exec($ch);
         curl_close($ch);
-        Log::info('Delete product result: ' . $response);
+        Log::info($this->interactionId . ' => Delete product result: ' . $response);
         return json_decode($response, true);
-    }
-
-    public static function gearmanWork(\GearmanJob $job)
-    {
-        $json_data = $job->workload();
-        $json_data = json_decode($json_data, true);
-
-        Log::info('gearmanWork:' . json_encode($json_data));
-
-        file_put_contents(storage_path() . '/app/gearmant_test', json_encode($json_data));
     }
 }
