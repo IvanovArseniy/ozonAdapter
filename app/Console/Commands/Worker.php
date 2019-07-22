@@ -12,7 +12,7 @@ class Worker extends Command
     public function handle()
     {
         $worker = new \GearmanWorker();
-        $worker->addServer('localhost');
+        $worker->addServer(config('app.gearmman_server'));
 
         $worker->addFunction('processOrderNotification', '\App\Services\GearmanService::processOrderNotification');
         $worker->addFunction('processForRetry', '\App\Services\GearmanService::processForRetry');

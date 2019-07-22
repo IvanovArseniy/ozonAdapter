@@ -9,35 +9,35 @@ class GearmanService
     public static function addUpdateProductNotification($data)
     {
         $client = new \GearmanClient();
-        $client->addServers('localhost');
+        $client->addServers(config('app.gearmman_server'));
         $client->doBackground('updateProduct', json_encode($data));
     }
 
     public static function addOrderNotification($data)
     {
         $client = new \GearmanClient();
-        $client->addServers('localhost');
+        $client->addServers(config('app.gearmman_server'));
         $client->doHighBackground('processOrderNotification', json_encode($data));
     }
 
     public static function addProcessProductToOzonNotification($data)
     {
         $client = new \GearmanClient();
-        $client->addServers('localhost');
+        $client->addServers(config('app.gearmman_server'));
         $client->doBackground('processProductToOzon', json_encode($data));
     }
 
     public static function addSetOzonProductIdNotification($data)
     {
         $client = new \GearmanClient();
-        $client->addServers('localhost');
+        $client->addServers(config('app.gearmman_server'));
         $client->doBackground('setOzonProductId', json_encode($data));
     }
     
     public static function addForRetry($data)
     {
         $client = new \GearmanClient();
-        $client->addServers('localhost');
+        $client->addServers(config('app.gearmman_server'));
         $client->doBackground('processForRetry', json_encode($data));
     }
 

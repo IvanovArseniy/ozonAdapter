@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'gearmman_server' => '127.0.0.1',
     'ozon_api_client_id' => '3639',
     'ozon_api_key' => '4e1938c1-671d-40cd-ab4b-dada9fa16159',
 
