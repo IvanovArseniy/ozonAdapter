@@ -1967,7 +1967,7 @@ class OzonService
                 ->first();
 
             if (!$existedOrder) {
-                if ($i > 4) {
+                if ($i > 30) {
                     continue;
                 }
                 $orderInfo = $this->getOzonOrderInfo($ozonOrder['order_id']);
@@ -1994,10 +1994,9 @@ class OzonService
             } else {
                 //Заказ уже есть, проверяем не вышло ли 4 часа для отмены
                 $dt = new \DateTime($existedOrder->create_date);
-                $dt->modify('+3 hour');
+                $dt->add(new \DateInterval('PT3H'));
                 $dt->add(new \DateInterval('PT4H'));
                 $dtnow = new \DateTime();
-                $dtnow->modify('+3 hour');
                 if($dtnow > $dt){
                     //4 часа вышло - пора аппрувить на ozon'е
                     $statusResult = $this->setOrderStatus($ozonOrder['order_id'], config('app.order_approve_status'), null, null);
@@ -2189,12 +2188,12 @@ class OzonService
         $date = new \DateTime($order['order_time']);
         $date->modify('+3 hour');
         $date_approve_at = new \DateTime($order['order_time']);
+        $date_approve_at->modify('+3 hour');
         $check_date = new \DateTime($order['order_time']);
         $check_date->modify('+24 hour');
         if ($check_date < new \DateTime('NOW')) {
             $date_approve_at = new \DateTime('NOW');
         }
-        $date_approve_at->modify('+3 hour');
         $date_approve_at->add(new \DateInterval('P3D'));
         $status = $this->mapOrderStatus($order['status']);
         $response = [
