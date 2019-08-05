@@ -133,6 +133,8 @@ class GearmanService
 
             $res = app('db')->connection('mysql')->table('gearman_retry_queue')
                 ->where('processing', 1)
+                ->skip(0)
+                ->take(30000)
                 ->get();
             if ($res) {
                 foreach ($res as $key => $row) {
