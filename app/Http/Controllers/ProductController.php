@@ -111,9 +111,16 @@ class ProductController extends BaseController
         $product = json_decode($request->getContent(), true);
         Log::info($interactionId . ' => Update product:'. strval($productId));
         Log::info($interactionId . ' => Update product:'. json_encode($product));
-        $result = $ozonService->updateProductLight($product, $productId);
+        $updateProductResult = $ozonService->updateProductLight($product, $productId);
+        $result = $updateProductResult['result'];
+        $success = $updateProductResult['success'];
         Log::info($interactionId . ' => Update product response:'. json_encode($result));
-        return response()->json($result);
+        if ($success) {
+            return response()->json($result);
+        }
+        else {
+            return response()->json($result, 500);
+        }
     }
 
     public function deleteProduct(OzonService $ozonService, Request $request, $productId)
