@@ -2200,11 +2200,6 @@ class OzonService
         $date->modify('+3 hour');
         $date_approve_at = new \DateTime($order['order_time']);
         $date_approve_at->modify('+3 hour');
-        $check_date = new \DateTime($order['order_time']);
-        $check_date->modify('+24 hour');
-        if ($check_date < new \DateTime('NOW')) {
-            $date_approve_at = new \DateTime('NOW');
-        }
         $date_approve_at->add(new \DateInterval('P3D'));
         $status = $this->mapOrderStatus($order['status']);
         $response = [
