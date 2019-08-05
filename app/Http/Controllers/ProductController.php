@@ -7,6 +7,7 @@ use Laravel\Lumen\Routing\Controller as BaseController;
 use Illuminate\Http\Request as Request;
 use App\Services\OzonService;
 use App\Services\DropshippService;
+use App\Services\GearmanService;
 
 class ProductController extends BaseController
 {
@@ -51,11 +52,11 @@ class ProductController extends BaseController
 
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Send products and get IDs.');
-        $sendResult = $ozonService->scheduleProductCreation();
-        $sendResult = $ozonService->scheduleProductCreation();
-        $idsResult = $ozonService->setOzonProductId();
+        // $sendResult = $ozonService->scheduleProductCreation();
+        // $sendResult = $ozonService->scheduleProductCreation();
+        //$idsResult = $ozonService->setOzonProductId();
         Log::info($interactionId . ' => Send products result:' . json_encode($sendResult));
-        Log::info($interactionId . ' => Get ids result:' . json_encode($idsResult));
+        //Log::info($interactionId . ' => Get ids result:' . json_encode($idsResult));
         Log::info($interactionId . ' => Send products and get IDs ready!');
 
         unlink(storage_path() . '/app/scheduleJobs.lock');
@@ -79,37 +80,19 @@ class ProductController extends BaseController
 
     public function setProductExternalId(OzonService $ozonService)
     {
-        if (file_exists(storage_path() . '/app/setProductExternalId.lock')) {
-            return response()->json(['error' => 'setProductExternalId job already in work']);
-        }
-        file_put_contents(storage_path() . '/app/setProductExternalId.lock', 'Start');
+        // if (file_exists(storage_path() . '/app/setProductExternalId.lock')) {
+        //     return response()->json(['error' => 'setProductExternalId job already in work']);
+        // }
+        // file_put_contents(storage_path() . '/app/setProductExternalId.lock', 'Start');
 
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Set product external Ids started');
         $response = $ozonService->setOzonProductId();
         Log::info($interactionId . ' => Set product external Ids finished');
 
-        unlink(storage_path() . '/app/setProductExternalId.lock');
+        // unlink(storage_path() . '/app/setProductExternalId.lock');
 
         return response()->json($response);
-    }
-
-    public function setStock(OzonService $ozonService)
-    {
-        if (file_exists(storage_path() . '/app/setStock.lock')) {
-            return response()->json(['error' => 'setStock job already in work']);
-        }
-        file_put_contents(storage_path() . '/app/setStock.lock', 'Start');
-
-        $interactionId = $ozonService->getInteractionId();
-        Log::info($interactionId . ' => Send stocks started!');
-        $result = $ozonService->sendStocks(0);
-        $result = $ozonService->sendStocks(0);
-        Log::info($interactionId . ' => Send stocks ready!');
-
-        unlink(storage_path() . '/app/setStock.lock');
-
-        return response()->json($result);
     }
 
     public function createProductCombination(OzonService $ozonService, Request $request, $productId)
@@ -200,5 +183,51 @@ class ProductController extends BaseController
         Log::info('Notify product started!');
         $dropshippService->notifyProducts($notifyingProductIds);
         return response()->json(['OK']);
+    }
+
+    public function gearmanTry(OzonService $ozonService, DropshippService $dropshippService)
+    {
+        Log::info('Try add gearman job!');
+
+        GearmanService::add([
+            'msg' => 'Test msg',
+            'ts' => time(),
+            'dt' => date('Y-m-d H:i:s'),
+        ]);
+
+        return response()->json(['OK']);
+    }
+
+    public function testMethod(Request $request)
+    {
+        // $result = ['result' => 'OK'];
+        // // $ozonService = new OzonService();
+        // // $processProductResult = $ozonService->processProductToOzon(['mall_variant_id' => '8f350454-54b7-45fb-ae95-6c3834bf4281']);
+
+        // // $dropshippService = new DropshippService();
+        // // $result = $dropshippService->test();
+
+        //  $result = GearmanService::processForRetry(new \GearmanJob);
+
+        // //$resulr = boolval(preg_match('/^JNTCU(\d){10}YQ$/i', $test));
+        // //GearmanService::addProcessProductToOzonNotification(['mall_variant_id' => $variant['mallVariantId']]);
+
+        // // $product = json_decode($request->getContent(), true);
+
+        // // $ozonService = new OzonService();
+        // // $processProductResult = $ozonService->sendStockAndPriceAndEnabledForProduct($product);        
+        
+ 
+        $timerStart = $milliseconds = round(microtime(true) * 1000);
+        sleep(5);
+        $timerEnd = $milliseconds = round(microtime(true) * 1000);
+        $t = ($timerEnd - $timerStart);
+
+
+        $result = [
+            'timer1' => $t
+        ];
+
+        return response()->json($result);
     }
 }

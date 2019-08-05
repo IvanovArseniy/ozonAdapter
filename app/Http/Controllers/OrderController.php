@@ -31,7 +31,27 @@ class OrderController extends BaseController
             isset($statusInfo['trackingNumber']) ? $statusInfo['trackingNumber'] : null,
             isset($statusInfo['items']) ? $statusInfo['items'] : null);
         Log::info($interactionId . ' => Set order status result:'. json_encode($result));
-        return response()->json($result);
+        if (!is_null($result) && isset($result['http_code']) && intval($result['http_code']) == 200) {
+            return response()->json([
+                'order_id' => $result['order_id'],
+                'fulfillmentStatus' => $result['fulfillmentStatus'],
+                'response' => $result['response'],
+            ]);
+        }
+        elseif (!is_null($result) && isset($result['http_code']) && intval($result['http_code']) != 200) {
+            return response()->json([
+                'order_id' => $result['order_id'],
+                'fulfillmentStatus' => $result['fulfillmentStatus'],
+                'response' => $result['response'],
+            ], $result['http_code']);
+        }
+        else {
+            return response()->json([
+                'order_id' => $result['order_id'],
+                'fulfillmentStatus' => $result['fulfillmentStatus'],
+                'response' => $result['response'],
+            ], 500);
+        }
     }
 
     public function getOrderList(OzonService $ozonService, DropshippService $dropshippService)
@@ -39,7 +59,15 @@ class OrderController extends BaseController
         $interactionId = $ozonService->getInteractionId();
         Log::info($interactionId . ' => Get list of orders');
         $notifyingOrderIds = $ozonService->getOrderList();
-        $notifyResult = $dropshippService->notifyOrders();
+        return response()->json($notifyingOrderIds);
+    }
+
+    public function sendOrderNotifications(DropshippService $dropshippService)
+    {
+        Log::info(' => Send order notifications');
+        //$notifyResult = $dropshippService->notifyOrders();
+        $notifyResult = [];
+        Log::info(' => Send order notifications ready');
         return response()->json($notifyResult);
     }
 
