@@ -1003,38 +1003,196 @@ class OzonService
     public function updateProduct($product, $productId)
     {
         $result = [];
-        if (isset($product['variants']) && count($product['variants']) > 0) {
+        $shippingError = false;
+        $newVariants = [];
+        $success = true;
 
+        $productVariants = $this->getAllProductVariants($productId);
+        if (isset($product['variants']) && count($product['variants']) > 0) {
+            $mallVariantIds = [];
+            $mallVariantIdsFromDb = [];
             foreach ($product['variants'] as $key => $variant) {
-                if (!is_null($variant['price']) || !is_null($variant['inventory'])) {
-                    $item = [];
-                    if (!is_null($product['name'])) {
-                        $item['name'] = $product['name'];
+                array_push($mallVariantIds, $variant['mallVariantId']);
+            }
+
+            $deactivatedProductVariants = [];
+            $activatedProductVariants = [];
+            foreach ($productVariants as $key => $productVariant) {
+                array_push($mallVariantIdsFromDb, $productVariant->mallVariantId);
+
+                if (!in_array($productVariant->mallVariantId, $mallVariantIds)) {
+                    if ($productVariant->ozonProductId != null) {
+                        $this->deactivateProduct($productVariant->ozonProductId);
                     }
-                    if (!is_null($product['description'])) {
-                        $item['description'] = $product['description'];
+                    array_push($deactivatedProductVariants, $productVariant->id);
+                }
+                else if($productVariant->deleted == 1) {
+                    array_push($activatedProductVariants, $productVariant->id);
+                }
+            }
+
+            if (count($deactivatedProductVariants) > 0) {
+                app('db')->connection('mysql')->table('product_variant')
+                    ->whereIn('id', $deactivatedProductVariants)
+                    ->update(['deleted' => 1]);
+            }
+
+            if (count($activatedProductVariants) > 0) {
+                app('db')->connection('mysql')->table('product_variant')
+                    ->whereIn('id', $activatedProductVariants)
+                    ->update(['deleted' => 0]);
+            }
+
+            $variantsToUpdate = [];
+            foreach ($product['variants'] as $key => $variant) {
+                if (!in_array($variant['mallVariantId'], $mallVariantIdsFromDb)) {
+                    array_push($newVariants, $variant);
+                    continue;
+                }
+
+                $item = [];
+
+                if (isset($variant['priceRaw'])) {
+                    $shippingError = false;
+                    if (isset($variant['shippingRaw'])) {
+                        foreach ($variant['shippingRaw'] as $key => $shipping) {
+                            if (isset($shipping['geo_id']) && strtolower(strval($shipping['geo_id'])) == strtolower(config('app.shipping_rf_code'))) {
+                                $shippingError = false;
+                                break;
+                            }
+                            else {
+                                $shippingError = true;
+                            }
+                        }
                     }
-                    if (!is_null($product['enabled'])) {
-                        $item['enabled'] = $product['enabled'];
+                    else {
+                        continue;
                     }
-                    if (!is_null($variant['price'])) {
-                        $item['price'] = $variant['price'];
+
+                    if ($shippingError) {
+                        continue;
                     }
-                    if (!is_null($variant['inventory'])) {
+
+                    $shippingPrice = 0;
+                    foreach ($variant['shippingRaw'] as $key => $shipping) {
+                        if (strtolower(strval($shipping['geo_id'])) == strtolower(config('app.shipping_rf_code'))) {
+                            $shippingPrice = floatval($shipping['price']);
+                            break;
+                        }
+                    }
+                    $price = round((floatval($variant['priceRaw']) / 1.0815 * 1.035) + ($shippingPrice * 1.035), 2);
+                    $item['price'] = $price;
+                }
+
+                if (isset($variant['inventory']) && !is_null($variant['inventory'])) {
+                    if (isset($variant['isPromo']) && boolval($variant['isPromo'])) {
                         $item['quantity'] = $variant['inventory'];
                     }
-                    if (!is_null($variant['color'])) {
-                        $item['color'] = $variant['color'];
+                    else {
+                        $item['quantity'] = $variant['inventory'] - 5 > 0 ? $variant['inventory'] - 5 : 0;
                     }
-                    if (!is_null($variant['size'])) {
-                        $item['size'] = $variant['size'];
-                    }
-                    array_push($result, $this->updateOzonProduct($item, $productId, $variant->mallVariantId));
+                }
+
+                if (isset($product['enabled'])) {
+                    $item['enabled'] = $product['enabled'];
+                }
+
+
+                $variantToUpdate = $this->checkOzonProducts($productId, $variant['mallVariantId']);
+                if (isset($variantToUpdate['Success']) && $variantToUpdate['Success']) {
+                    $variantToUpdate['item'] = $item;
+                    array_push($variantsToUpdate, $variantToUpdate);
+                }
+                else {
+                    $success = false;
+                    array_push($result, ['error' => $variantToUpdate['result']]);
+                    break;
+                }
+            }
+
+            if ($success) {
+                foreach ($variantsToUpdate as $key => $toUpdate) {
+                    $this->saveProductVariant($toUpdate['item'], $productId, $toUpdate['mallVariantId'], $toUpdate['ozonProductId']);
+    
+                    array_push($result, ['productId' => $productId]);
+                }
+            }            
+        }
+        else if (isset($product['enabled'])) {
+            $variantsToUpdate = [];
+            foreach ($productVariants as $key => $productVariant) {
+                $variantToUpdate = $this->checkOzonProducts($productId, $productVariant->mallVariantId);
+                if (isset($variantToUpdate['Success']) && $variantToUpdate['Success']) {
+                    array_push($variantsToUpdate, $variantToUpdate);
+                }
+                else {
+                    $success = false;
+                    array_push($result, ['error' => $variantToUpdate['result']]);
+                    break;
+                }
+            }
+
+            if ($success) {
+                foreach ($variantsToUpdate as $key => $toUpdate) {
+                    $item = [
+                        'enabled' => $product['enabled']
+                    ];
+                    $this->saveProductVariant($item, $productId, $toUpdate['mallVariantId'], $toUpdate['ozonProductId']);
+    
+                    array_push($result, ['productId' => $productId]);
                 }
             }
         }
+
+        if (count($newVariants) > 0) {
+            $variantIds = $this->createVariants($newVariants, $productId, isset($product['enabled']) ? $product['enabled'] : null);
+        }
         
-        return $result;
+        return [
+            'result' => $result,
+            'success' => $success
+        ];
+    }
+
+    protected function checkOzonProducts($productId, $mallVariantId)
+    {
+        $variantToUpdate = [];
+        $productVariant = $this->getOzonProductId($productId, $mallVariantId);
+
+        if (is_null($productVariant['ozonProductId'])) {
+            $byofferResponse = $this->getProductFromOzonByOfferId($mallVariantId);
+            $byofferResult = json_decode($byofferResponse, true);
+            if (isset($byofferResult['result'])) {
+                app('db')->connection('mysql')->table('product_variant')
+                    ->where('mall_variant_id', $mallVariantId)
+                    ->update(['ozon_product_id' => $byofferResult['result']['id']]);
+            }
+        }
+
+        if ($productVariant['Success'] && !is_null($productVariant['ozonProductId'])) {
+            $ozonProductResult = $this->getProductInfo($productVariant['ozonProductId']);
+            if (isset($ozonProductResult['result'])) {
+                $variantToUpdate = [
+                    'mallVariantId' => $mallVariantId,
+                    'ozonProductId' => $productVariant['ozonProductId'],
+                    'Success' => true
+                ];
+            }
+            else {
+                $variantToUpdate = [
+                    'Success' => false,
+                    'result' => $ozonProductResult
+                ];
+            }
+        }
+        else {
+            $variantToUpdate = [
+                'Success' => false,
+                'result' => isset($productVariant['Error']) ? $productVariant['Error'] : "Unexpected error"
+            ];
+        }
+
+        return $variantToUpdate;
     }
 
     public function updateProductLight($product, $productId)
