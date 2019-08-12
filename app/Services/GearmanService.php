@@ -38,7 +38,7 @@ class GearmanService
     {
         $client = new \GearmanClient();
         $client->addServers(config('app.gearmman_server'));
-        $client->doBackground('processForRetry', json_encode($data));
+        $client->doHighBackground('processForRetry', json_encode($data));
     }
 
     public static function updateProduct(\GearmanJob $job)

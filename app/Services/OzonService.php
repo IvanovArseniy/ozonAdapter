@@ -1484,7 +1484,7 @@ class OzonService
                 }
 
                 app('db')->connection('mysql')->table('product_variant')
-                    ->where('product_id', $ozonProductId)
+                    ->where('ozon_product_id', $ozonProductId)
                     ->update($updatedFields);
             }
         }
