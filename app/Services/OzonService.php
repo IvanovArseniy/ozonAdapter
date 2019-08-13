@@ -1100,6 +1100,7 @@ class OzonService
 
                 $variantToUpdate = $this->checkOzonProducts($productId, $variant['mallVariantId']);
                 if (isset($variantToUpdate['Success']) && $variantToUpdate['Success']) {
+                    $item['quantity'] = intval($item['quantity']) + $variantToUpdate['reservedStock'];
                     $variantToUpdate['item'] = $item;
                     array_push($variantsToUpdate, $variantToUpdate);
                 }
@@ -1175,7 +1176,8 @@ class OzonService
                 $variantToUpdate = [
                     'mallVariantId' => $mallVariantId,
                     'ozonProductId' => $productVariant['ozonProductId'],
-                    'Success' => true
+                    'Success' => true,
+                    'reservedStock' => (isset($ozonProductResult['result']['stocks']) && isset($ozonProductResult['result']['stocks']['reserved'])) ? intval($ozonProductResult['result']['stocks']['reserved']) : 0
                 ];
             }
             else {
