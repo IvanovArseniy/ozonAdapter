@@ -9,6 +9,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\EddyService;
+use App\Services\GearmanService;
 use App\Services\OzonService;
 use Laravel\Lumen\Routing\Controller as BaseController;
 use vendor\project\StatusTest;
@@ -28,7 +29,6 @@ class ChatController extends BaseController
 
                 if ($chatItem['last_message_id'] == $ticket->last_added_message_id)
                 {
-                    echo "Synchronized (" . $chatItem['id'] . ")" ;
                     continue;
                 }
 
@@ -49,7 +49,6 @@ class ChatController extends BaseController
             {
                 $exTicket = $es::getByExistingChatId($chatItem['id']);
                 if ($exTicket->last_added_message_id == $chatItem['last_message_id']){
-                    echo "Ticket added (" . $exTicket->eddy_ticket_id . ")";
                     break;
                 }
                 $chatMessages = $os->getChatMessages($chatItem['id'],$exTicket->last_added_message_id,3);
@@ -63,5 +62,10 @@ class ChatController extends BaseController
                 }
             }
         }
+    }
+
+    public static function handle()
+    {
+        GearmanService::chatEddySync();
     }
 }

@@ -65,6 +65,6 @@ $router->group(['prefix' => '1/categories', 'middleware' => 'auth'], function() 
 });
 
 $router->group(['prefix' => '1/chatsync', /*'middleware' => 'auth'*/], function() use ($router) {
-    $router->get('/', 'ChatController@SyncChat');
+    $router->get('/', 'ChatController@handle');
 
 });

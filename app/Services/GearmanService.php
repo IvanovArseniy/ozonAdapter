@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Services;
+use App\Http\Controllers\ChatController;
 use Log;
 use DateTime;
 
@@ -39,6 +40,14 @@ class GearmanService
         $client = new \GearmanClient();
         $client->addServers(config('app.gearmman_server'));
         $client->doBackground('processForRetry', json_encode($data));
+    }
+
+    public static function chatEddySync($data = [])
+    {
+        $client = new \GearmanClient();
+        $client->addServers(config('app.gearmman_server'));
+
+        $client->doHighBackground('chatEddySync', json_encode($data));
     }
 
     public static function updateProduct(\GearmanJob $job)
@@ -120,6 +129,15 @@ class GearmanService
                 ]
             );
         }
+    }
+
+    public static function syncChatsWithEddy(\GearmanJob $job)
+    {
+        $data = $job->workload();
+        $cc = new ChatController();
+        $os = new OzonService();
+        $es = new EddyService();
+        $cc->SyncChat($os,$es);
     }
 
    public static function processForRetry(\GearmanJob $job)
