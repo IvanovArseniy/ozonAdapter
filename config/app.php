@@ -1,11 +1,27 @@
 <?php
 
 return [
-    'gearmman_server' => '127.0.0.1',
+    'gearmman_server' => 'localhost',
+
+    /*sb*/
+    /*'ozon_api_client_id' => '466',
+    'ozon_api_key' => '9753260e-2324-fde7-97f1-7848ed7ed097',
+    'ozon_base_url' => 'http://cb-api.ozonru.me',*/
+
     'ozon_api_client_id' => '3639',
     'ozon_api_key' => '4e1938c1-671d-40cd-ab4b-dada9fa16159',
-
     'ozon_base_url' => 'https://api-seller.ozon.ru',
+
+
+
+    'eddy_base_url' => 'https://mallmycom.helpdeskeddy.com/api/v2',
+    'eddy_get_tickets_url' => '/tickets/',
+    'eddy_get_tickets_fields_url' => '/custom_fields/',
+    'eddy_api_key' => 'a51d05f2-c706-486e-9304-a938249c2353',
+    'eddy_login' => 'julia.novikova@corp.mail.ru',
+    'eddy_add_ticket_url' => '/tickets/',
+    'eddy_add_message_url' => '/tickets/{ticketId}/posts/',
+
     'ozon_productinfo_url' => '/v1/product/info',
     'ozon_importproduct_url' => '/v1/product/import',
     'ozon_createproduct_url' => '/v1/products/create',
