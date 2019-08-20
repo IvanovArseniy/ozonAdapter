@@ -2544,14 +2544,20 @@ class OzonService
     }
 
     public function getChats(){
-        $chatList = $this->sendData('/v1/chat/list',['page_size'=>100, /*'chat_id_list'=>['dcdcb35a-713e-4035-8427-3359a247afa4']*/]);
-        return $chatList;
+        $chatList = $this->sendData('/v1/chat/list',['page_size'=>100]);
+        return $chatList['response'];
     }
     public function getChatMessages($chatId, $messageId = null, $limit = 5){
-        $messageData = $this->sendData('/v1/chat/history',['chat_id'=>$chatId,'from_message_id'=>$messageId, 'limit'=>$limit]);
-        return json_decode($messageData,1);
+        $messageData = $this->sendData('/v1/chat/updates',['chat_id'=>$chatId,'from_message_id'=>$messageId, 'limit'=>$limit]);
+        return json_decode($messageData['response'],1);
     }
-
+    public function isChatTicketExists($chatId)
+    {
+        $chatTicket = app('db')->connection('mysql')->table('chat_eddy_ticket')
+            ->where('chat_id', $chatId)
+            ->first();
+        return $chatTicket ? $chatTicket->id > 0 : false;
+    }
 
     ////Common
 

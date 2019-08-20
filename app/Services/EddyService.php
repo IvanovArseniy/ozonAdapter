@@ -42,8 +42,6 @@ class EddyService
         curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
         curl_setopt($ch, CURLOPT_USERPWD, config('app.eddy_login') . ':' . config('app.eddy_api_key'));
         if ($usePost){
-            //$queryString = json_encode($data);
-            var_dump(strlen($queryString));
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS,$queryString);
             curl_setopt($ch, CURLOPT_HTTPHEADER, array(
@@ -81,16 +79,46 @@ class EddyService
         return $addTicketResponse;
     }
 
+    public function registerTicketInDb($chatData, $ticketData,$lastAddedMessage)
+    {
+        try {
+            $ticketRegisterResult = app('db')->connection('mysql')->table('chat_eddy_ticket')
+                ->insert([
+                    'chat_id' => $chatData['id'],
+                    'eddy_ticket_id' => $ticketData['id'],
+                    'eddy_ticket_unique_id' => $ticketData['unique_id'],
+                    'last_message_id' => $chatData['last_message_id'],
+                    'last_added_message_id' => $lastAddedMessage,
+                ]);
+        } catch (\Exception $e) {
+            $ticketRegisterResult = false;
+        }
+    }
+
     public function addMessage($ticket,$text,$files = null){
         $url = str_replace('{ticketId}', $ticket, $this->addMessageUrl );
         $messagePayload = ['text'=>$text];
         if (is_array($files) && !empty($files)){
             $messagePayload['files'] = $files;
         }
-        var_dump($messagePayload);
-
         $addMessageResponse = json_decode( $this->sendData($url,$messagePayload, true),1);
         return $addMessageResponse;
+    }
+
+    public static function getByExistingChatId($chatId)
+    {
+        $ticket = app('db')->connection('mysql')->table('chat_eddy_ticket')
+            ->where('chat_id', $chatId)
+            ->first();
+        return $ticket;
+    }
+
+    public static function updateRegisteredTicket($eddyTicketId,$fields)
+    {
+        app('db')->connection('mysql')->table('chat_eddy_ticket')
+            ->where('eddy_ticket_id', $eddyTicketId)
+            ->update($fields);
+
     }
 
     public static function getOzonOrderNumber($title){
@@ -112,8 +140,8 @@ class EddyService
 
     public static function convertChatData($chatData){
         return [
-            'title' => 'Ozon order number: ' . $chatData['order_number'],
-            'description' => 'Ozon order number: ' . $chatData['order_number'],
+            'title' => 'Ozon order number: ' . $chatData['id'] . '_test',
+            'description' => 'Ozon order number: ' . $chatData['id'] . '_test',
             'owner_id' => '2116',
 
         ];
