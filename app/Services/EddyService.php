@@ -79,7 +79,7 @@ class EddyService
         return $addTicketResponse;
     }
 
-    public function registerTicketInDb($chatData, $ticketData,$lastAddedMessage)
+    public function registerTicketInDb($chatData, $ticketData)
     {
         try {
             $ticketRegisterResult = app('db')->connection('mysql')->table('chat_eddy_ticket')
@@ -88,7 +88,7 @@ class EddyService
                     'eddy_ticket_id' => $ticketData['id'],
                     'eddy_ticket_unique_id' => $ticketData['unique_id'],
                     'last_message_id' => $chatData['last_message_id'],
-                    'last_added_message_id' => $lastAddedMessage,
+                    'last_added_message_id' => null,
                 ]);
         } catch (\Exception $e) {
             $ticketRegisterResult = false;

@@ -43,16 +43,25 @@ class ChatController extends BaseController
             }
 
             $ticket = $es->addTicket($chatItem);
-            $chatMessages = $os->getChatMessages($chatItem['id'],null,3);
-            if (!array_key_exists('errors',$ticket))
+            $es->registerTicketInDb($chatItem,$ticket['data']);
+
+            while (true)
             {
-                foreach ($chatMessages['result'] as $chatMessage)
-                {
-                    $isMessageAdded = $es->addMessage($ticket['data']['id'], $chatMessage['text'],$chatMessage['file']);
+                $exTicket = $es::getByExistingChatId($chatItem['id']);
+                if ($exTicket->last_added_message_id == $chatItem['last_message_id']){
+                    echo "Ticket added (" . $exTicket->eddy_ticket_id . ")";
+                    break;
                 }
-                $es->registerTicketInDb($chatItem,$ticket['data'], $chatMessage['id']);
+                $chatMessages = $os->getChatMessages($chatItem['id'],$exTicket->last_added_message_id,3);
+                if (!array_key_exists('errors',$ticket))
+                {
+                    foreach ($chatMessages['result'] as $chatMessage)
+                    {
+                        $isMessageAdded = $es->addMessage($ticket['data']['id'], $chatMessage['text'],$chatMessage['file']);
+                    }
+                    $es::updateRegisteredTicket($exTicket->eddy_ticket_id,['last_added_message_id'=>$chatMessage['id']]);;
+                }
             }
         }
-        echo 1;
     }
 }
