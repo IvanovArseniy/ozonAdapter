@@ -2293,6 +2293,7 @@ class OzonService
 
         if (isset($order['result'])) {
             $fullItems = array();
+            $productSuccess = true;
             foreach ($order['result']['items'] as $key => $item) {
                 $product = app('db')->connection('mysql')
                     ->select('select pv.product_id as productId, p.description as description, pv.mall_variant_id as mallVariantId from product_variant pv
@@ -2300,9 +2301,14 @@ class OzonService
                         where ozon_product_id = ' . $item['product_id']);
                 $ozonProduct = $this->getProductInfo($item['product_id']);
 
+                if (!isset($ozonProduct['result'])) {
+                    $productSuccess = false;
+                    continue;
+                }
+
                 $productName = '';
                 $productImage = '';
-                if (!is_null($ozonProduct['result'])) {
+                if (isset($ozonProduct['result']) && !is_null($ozonProduct['result'])) {
                     $productName = $ozonProduct['result']['name'];
                     $productImage = $ozonProduct['result']['images'][0];
                 }
@@ -2339,6 +2345,10 @@ class OzonService
                 ]);
             }
 
+            if (!$productSuccess) {
+                return ['error' => true, 'errorCode' => 'NO_ITEM_INFO'];
+            }
+
             $order['result']['items'] = $fullItems;
             return $order;
         }
@@ -2357,6 +2367,7 @@ class OzonService
         $status = $this->mapOrderStatus($order['status']);
         $response = [
             'order_id' => $order['order_nr'],
+            'number' => $order['order_nr'],
             'ozon_order_id' => $order['order_id'],
             'paymentStatus' => 'PAID',
             'fulfillmentStatus' => $status,

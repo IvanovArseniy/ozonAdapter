@@ -34,6 +34,7 @@ return [
     //'dropshipp_order_url' => '/api/v1/orders/{owner_id}/{store_num}'
     'dropshipp_order_url' => '/api/v1/orders/1/{store_num}',
     'dropshipp_order_url_action' => '/api/v1/orders/1/{store_num}/{action}',
+    'dropshipp_createorder_url' => '/api/v2/orders?-apikey=ak_f4d1b81c00443db21a8fdb569150ba79&owner_id=1',
 
     'dropshipp_updateproduct_url' => '/api/v1/products/1/{product_id}',
 

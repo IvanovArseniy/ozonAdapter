@@ -21,6 +21,7 @@ class DropshippService
         $this->baseUrl = config('app.dropshipp_base_url');
         $this->tokenUrl = config('app.dropshipp_token_url');
         $this->orderUrl = config('app.dropshipp_order_url');
+        $this->createOrderUrl = config('app.dropshipp_createorder_url');
         $this->orderUrlAction = config('app.dropshipp_order_url_action');
         $this->setOrderStatusUrl = '';
         $this->updateProductUrl = config('app.dropshipp_updateproduct_url');
@@ -187,26 +188,40 @@ class DropshippService
 
     protected function notifyNewOrder($orderNr)
     {
-        Log::info($this->interactionId . ' => New order:' . json_encode($orderNr));
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl)));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-        Log::info($this->interactionId . ' => Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl)));
-        $response = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        Log::info($this->interactionId . ' => Notify new order: ' . $response);
+        Log::info($this->interactionId . ' => New order:' . json_encode($orderNr, JSON_UNESCAPED_UNICODE));
+        $ozonService = new OzonService();
+        $orderInfo = $ozonService->getOrderInfoCommon($orderNr);
+        Log::info($this->interactionId . ' => Create order info:' . json_encode($orderInfo, JSON_UNESCAPED_UNICODE));
 
-        $response = json_decode($response, true);
+        if (is_array($orderInfo) && isset($orderInfo['number']) && isset($orderInfo['items']) && count($orderInfo['items']) > 0) {
+            $ch = curl_init();
+            // curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl)));
+            curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->createOrderUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
 
-        if (isset($response['error']) && $http_code == 200) {
-            $ozonService = new OzonService();
-            $statusResult = $ozonService->setOrderStatus($orderNr, config('app.order_cancel_status'), null, null);
-            return $statusResult;
+            $data_string = json_encode($orderInfo, JSON_UNESCAPED_UNICODE);
+            $headers = ['Content-Type: application/json', 'Content-Length: ' . strlen($data_string)];
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $data_string);
+    
+            $response = curl_exec($ch);
+            $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            Log::info($this->interactionId . ' => Notify new order: ' . $response);
+    
+            $response = json_decode($response, true);
+    
+            if (isset($response['mall_error']) || (isset($response['error']))) {
+                $statusResult = $ozonService->setOrderStatus($orderNr, config('app.order_cancel_status'), null, null);
+                return $statusResult;
+            }
+            elseif (!isset(???)) {
+                return ['error' => true];   
+            }
+    
+            return $response;
         }
-
-        return $response;
+        else return ['error' => true];
     }
 
     protected function notifyDeletedOrder($orderNr)
