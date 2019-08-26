@@ -39,7 +39,7 @@ class GearmanService
     {
         $client = new \GearmanClient();
         $client->addServers(config('app.gearmman_server'));
-        $client->doBackground('processForRetry', json_encode($data));
+        $client->doHighBackground('processForRetry', json_encode($data));
     }
 
     public static function chatEddySync($data = [])
@@ -151,6 +151,8 @@ class GearmanService
 
             $res = app('db')->connection('mysql')->table('gearman_retry_queue')
                 ->where('processing', 1)
+                ->skip(0)
+                ->take(30000)
                 ->get();
             if ($res) {
                 foreach ($res as $key => $row) {
