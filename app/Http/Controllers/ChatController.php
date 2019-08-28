@@ -25,20 +25,27 @@ class ChatController extends BaseController
             if ($os->isChatTicketExists($chatItem['id']))
             {
 
-                $ticket = $es::getByExistingChatId($chatItem['id']);
-
-                if ($chatItem['last_message_id'] == $ticket->last_added_message_id)
+                while (true)
                 {
-                    continue;
+                    $ticket = $es::getByExistingChatId($chatItem['id']);
+
+                    if ($chatItem['last_message_id'] == $ticket->last_added_message_id)
+                    {
+                        break;
+                    }
+
+                    $chatMessages = $os->getChatMessages($chatItem['id'],$ticket->last_added_message_id,3);
+                    foreach ($chatMessages['result'] as $chatMessage)
+                    {
+                        if (empty($chatMessage)){
+                            continue;
+                        }
+                        $isMessageAdded = $es->addMessage($ticket->eddy_ticket_id, $chatMessage['text'],$chatMessage['file']);
+                    }
+
+                    $es::updateRegisteredTicket($ticket->eddy_ticket_id,['last_added_message_id'=>$chatMessage['id']]);;
                 }
 
-                $chatMessages = $os->getChatMessages($chatItem['id'],$ticket->last_added_message_id,3);
-                foreach ($chatMessages['result'] as $chatMessage)
-                {
-                    $isMessageAdded = $es->addMessage($ticket->eddy_ticket_id, $chatMessage['text'],$chatMessage['file']);
-                }
-
-                $es::updateRegisteredTicket($ticket->eddy_ticket_id,['last_added_message_id'=>$chatMessage['id']]);;
                 return;
             }
 
@@ -66,7 +73,6 @@ class ChatController extends BaseController
             }
         }
     }
-
     public function SyncChatsFromHelpdesk(OzonService $os, EddyService $es){
         $chatAnswer = json_decode($os->getChats(),1);
         $chatList = $chatAnswer['result'];
@@ -75,13 +81,17 @@ class ChatController extends BaseController
             $exTicket = $es::getByExistingChatId($chatItem['id']);
             $exTicketMessages = $es->getTicketMessages($exTicket->eddy_ticket_id);
             $chatMessages = $os->getChatMessages($chatItem['id']);
-            $unsyncedMessagesCount = count($exTicketMessages) - count($chatMessages);
+            unset($exTicketMessages['result'][count($exTicketMessages['result'])-1]);
+            $unsyncedMessagesCount = count($exTicketMessages['result']) - count($chatMessages['result']);
             if ($unsyncedMessagesCount > 0)
             {
                 for ($i = $unsyncedMessagesCount - 1; $i >= 0; $i--)
                 {
                     $isMessageAdded = $os->addChatMessage($chatItem['id'],$exTicketMessages['result'][$i]['text']);
                 }
+                $chatMessagesNew = $os->getChatMessages($chatItem['id']);
+                $lastAddedMessageId = $chatMessagesNew['result'][count($chatMessagesNew['result']) - 1]['id'];
+                $es::updateRegisteredTicket($exTicket->eddy_ticket_id,['last_added_message_id'=>$lastAddedMessageId]);;
             }
         }
     }

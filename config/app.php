@@ -4,13 +4,13 @@ return [
     'gearmman_server' => 'localhost',
 
     /*sb*/
-    /*'ozon_api_client_id' => '466',
+    'ozon_api_client_id' => '466',
     'ozon_api_key' => '9753260e-2324-fde7-97f1-7848ed7ed097',
-    'ozon_base_url' => 'http://cb-api.ozonru.me',*/
+    'ozon_base_url' => 'http://cb-api.ozonru.me',
 
-    'ozon_api_client_id' => '3639',
+    /*'ozon_api_client_id' => '3639',
     'ozon_api_key' => '4e1938c1-671d-40cd-ab4b-dada9fa16159',
-    'ozon_base_url' => 'https://api-seller.ozon.ru',
+    'ozon_base_url' => 'https://api-seller.ozon.ru',*/
 
 
 
