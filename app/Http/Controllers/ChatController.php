@@ -64,6 +64,24 @@ class ChatController extends BaseController
         }
     }
 
+    public function SyncChatsFromHelpdesk(OzonService $os, EddyService $es){
+        $chatAnswer = json_decode($os->getChats(),1);
+        $chatList = $chatAnswer['result'];
+        foreach ($chatList as $chatItem)
+        {
+            $exTicket = $es::getByExistingChatId($chatItem['id']);
+            $exTicketMessages = $es->getTicketMessages($exTicket->eddy_ticket_id);
+            $chatMessages = $os->getChatMessages($chatItem['id']);
+            $unsyncedMessagesCount = count($exTicketMessages) - count($chatMessages);
+            if ($unsyncedMessagesCount > 0)
+            {
+                for ($i = $unsyncedMessagesCount - 1; $i >= 0; $i--)
+                {
+                    $isMessageAdded = $os->addChatMessage($chatItem['id'],$exTicketMessages['result'][$i]['text']);
+                }
+            }
+        }
+    }
     public static function handle()
     {
         GearmanService::chatEddySync();

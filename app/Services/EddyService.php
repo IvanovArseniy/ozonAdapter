@@ -72,13 +72,39 @@ class EddyService
         $fieldsResponse = $this->sendData($this->getTicketsFieldsUrl);
         return $fieldsResponse;
     }
-
+    public function getTicketMessages($ticketId)
+    {
+        $url = str_replace('{ticketId}', $ticketId, $this->addMessageUrl );
+        $currentPage = 1;
+        $totalPages = 1;
+        $result = [];
+        while ($currentPage <= $totalPages)
+        {
+            $getMessagesResponse = json_decode( $this->sendData($url, ['page'=>$currentPage],false),1);
+            foreach ($getMessagesResponse['data'] as $dataItem)
+            {
+                $result[] = $dataItem;
+            }
+            $currentPage ++;
+            $totalPages = $getMessagesResponse['pagination']['total_pages'];
+        }
+        $getMessagesResponse['result'] = $result;
+        return $getMessagesResponse;
+    }
     public function addTicket($chatData){
         $eddyData = self::convertChatData($chatData);
         $addTicketResponse = json_decode($this->sendData($this->addTicketUrl,$eddyData,true),1);
         return $addTicketResponse;
     }
 
+    public function getRegisteredTickets()
+    {
+        $tickets = app('db')->connection('mysql')->table('chat_eddy_ticket')
+            ->where('eddy_ticket_unique_id','IXF-00846')
+            ->get()
+            ->all();
+        return $tickets;
+    }
     public function registerTicketInDb($chatData, $ticketData)
     {
         try {

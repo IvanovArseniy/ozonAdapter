@@ -2544,7 +2544,7 @@ class OzonService
     }
 
     public function getChats(){
-        $chatList = $this->sendData('/v1/chat/list',['page_size'=>100]);
+        $chatList = $this->sendData('/v1/chat/list',['page_size'=>100,'chat_id_list'=>['867d9798-45ab-46f6-bc7e-3d5d78abc2a5']]);
         return $chatList['response'];
     }
     public function getChatMessages($chatId, $messageId = null, $limit = 5){
@@ -2558,7 +2558,11 @@ class OzonService
             ->first();
         return $chatTicket ? $chatTicket->id > 0 : false;
     }
-
+    public function addChatMessage($chatId,$text)
+    {
+        $isMessageAdded = $this->sendData('/v1/chat/send/message',['chat_id'=>$chatId,'text'=>strip_tags($text)]);
+        return $isMessageAdded;
+    }
     ////Common
 
 
