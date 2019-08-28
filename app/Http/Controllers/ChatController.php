@@ -56,6 +56,9 @@ class ChatController extends BaseController
                 {
                     foreach ($chatMessages['result'] as $chatMessage)
                     {
+                        if (empty($chatMessage)){
+                            continue;
+                        }
                         $isMessageAdded = $es->addMessage($ticket['data']['id'], $chatMessage['text'],$chatMessage['file']);
                     }
                     $es::updateRegisteredTicket($exTicket->eddy_ticket_id,['last_added_message_id'=>$chatMessage['id']]);;
@@ -85,5 +88,10 @@ class ChatController extends BaseController
     public static function handle()
     {
         GearmanService::chatEddySync();
+    }
+
+    public static function handleEddyChats()
+    {
+        GearmanService::eddyChatSync();
     }
 }
