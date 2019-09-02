@@ -63,3 +63,8 @@ $router->group(['prefix' => '1/categories', 'middleware' => 'auth'], function() 
     $router->put('/{categoryId}', 'CategoryController@updateCategoryName');
     $router->post('/insert', 'CategoryController@uploadCategories');
 });
+
+$router->group(['prefix' => '1/chatsync', /*'middleware' => 'auth'*/], function() use ($router) {
+    $router->get('/', 'ChatController@handle');
+
+});

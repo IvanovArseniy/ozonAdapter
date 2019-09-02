@@ -20,6 +20,7 @@ class Worker extends Command
         $worker->addFunction('setOzonProductId', '\App\Services\GearmanService::setOzonProductId');
         $worker->addFunction('updateProduct', '\App\Services\GearmanService::updateProduct');
         $worker->addFunction('processStockAndPrice', '\App\Services\GearmanService::updateProduct');
+        $worker->addFunction('chatEddySync', '\App\Services\GearmanService::syncChatsWithEddy');
 
         while (1) {
             $worker->work();

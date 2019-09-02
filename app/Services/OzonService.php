@@ -2713,9 +2713,26 @@ class OzonService
         }
     }
 
+    public function getChats(){
+        $chatList = $this->sendData('/v1/chat/list',['page_size'=>100]);
+        return $chatList['response'];
+    }
+    public function getChatMessages($chatId, $messageId = null, $limit = 5){
+        $messageData = $this->sendData('/v1/chat/updates',['chat_id'=>$chatId,'from_message_id'=>$messageId, 'limit'=>$limit]);
+        return json_decode($messageData['response'],1);
+    }
+    public function isChatTicketExists($chatId)
+    {
+        $chatTicket = app('db')->connection('mysql')->table('chat_eddy_ticket')
+            ->where('chat_id', $chatId)
+            ->first();
+        return $chatTicket ? $chatTicket->id > 0 : false;
+    }
 
     ////Common
-    protected function sendData($url, $data)
+
+
+    private function sendData($url, $data)
     {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $url);
