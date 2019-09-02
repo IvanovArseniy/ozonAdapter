@@ -132,7 +132,13 @@ class DropshippService
 
         $success = false;
         if ($notification['type'] == 'create') {
-            $result = $this->notifyNewOrder($notification['order_nr']);
+            
+            if ($notification['order_nr'] == '123-456') {
+                $result = $this->notifyNewOrderNew($notification['order_nr']);
+            }
+            else {
+                $result = $this->notifyNewOrder($notification['order_nr']);
+            }
             if (!isset($result['error'])) {
                 $success = true;
             }
@@ -188,6 +194,30 @@ class DropshippService
 
     protected function notifyNewOrder($orderNr)
     {
+        Log::info($this->interactionId . ' => New order:' . json_encode($orderNr));
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl)));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+        Log::info($this->interactionId . ' => Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl)));
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        Log::info($this->interactionId . ' => Notify new order: ' . $response);
+
+        $response = json_decode($response, true);
+
+        if (isset($response['error']) && $http_code == 200) {
+            $ozonService = new OzonService();
+            $statusResult = $ozonService->setOrderStatus($orderNr, config('app.order_cancel_status'), null, null);
+            return $statusResult;
+        }
+
+        return $response;
+    }
+
+    protected function notifyNewOrderNew($orderNr)
+    {
         Log::info($this->interactionId . ' => New order:' . json_encode($orderNr, JSON_UNESCAPED_UNICODE));
         $ozonService = new OzonService();
         $orderInfo = $ozonService->getOrderInfoCommon($orderNr);
@@ -195,7 +225,6 @@ class DropshippService
 
         if (is_array($orderInfo) && isset($orderInfo['number']) && isset($orderInfo['items']) && count($orderInfo['items']) > 0) {
             $ch = curl_init();
-            // curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl)));
             curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->createOrderUrl);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
@@ -210,17 +239,22 @@ class DropshippService
             Log::info($this->interactionId . ' => Notify new order: ' . $response);
     
             $response = json_decode($response, true);
-    
-            if (isset($response['mall_error']) || (isset($response['error']))) {
+
+            //order created
+            if (!isset($response['error']) && !isset($response['error_message']) && !isset($response['mall_error'])) {
+                return $response;            
+            }
+            //retry
+            elseif ((!isset($response['mall_error']) || trim($response['mall_error']) === '') && strpos($response['error_message'], 'Order was not purchased') !== false) {
+                return ['error' => true];   
+            }
+            //cancel order after error
+            else {
                 $statusResult = $ozonService->setOrderStatus($orderNr, config('app.order_cancel_status'), null, null);
                 return $statusResult;
             }
-            elseif (!isset(???)) {
-                return ['error' => true];   
-            }
-    
-            return $response;
         }
+        //order info failed. retry
         else return ['error' => true];
     }
 
