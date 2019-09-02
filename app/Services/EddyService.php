@@ -166,8 +166,8 @@ class EddyService
 
     public static function convertChatData($chatData){
         return [
-            'title' => 'Ozon order number: ' . $chatData['id'] . '_test',
-            'description' => 'Ozon order number: ' . $chatData['id'] . '_test',
+            'title' => 'Ozon order number: ' . $chatData['user']['id'],
+            'description' => 'Ozon order number: ' . $chatData['user']['id'],
             'owner_id' => '2116',
 
         ];
