@@ -164,14 +164,46 @@ class EddyService
         return $preparedData;
     }
 
+    public static function getRelatedOrders($customerId)
+    {
+        $orderResult = app('db')->connection('mysql')
+            ->table('orders')
+            ->where('ozon_order_nr', 'like', $customerId . '-%')
+            ->where('deleted', 0)
+            ->get()
+            ->all();
+        return $orderResult;
+    }
     public static function convertChatData($chatData){
+        $customerId = self::getCustomerId($chatData);
+        $customerOrders = self::getRelatedOrders($customerId);
+        $ticketDescriptionOrders = [];
+        foreach ($customerOrders as $customerOrder)
+        {
+            array_push($ticketDescriptionOrders, self::makeChatOrderLink($customerOrder));
+        }
         return [
-            'title' => 'Ozon order number: ' . $chatData['user']['id'],
-            'description' => 'Ozon order number: ' . $chatData['user']['id'],
+            'title' => 'Пользователь: ' . $customerId,
+            'description' =>'Номер заказа Озон:' . implode("<br />",$ticketDescriptionOrders),
             'owner_id' => '2116',
 
         ];
     }
 
-
+    public static function makeChatOrderLink($orderData)
+    {
+        if (empty($orderData)){
+            return '';
+        }
+        $url = config('app.dev_dropship_url') . '/orders/?txt=' . $orderData->ozon_order_id;
+        return "<a href='{$url}'>" . $orderData->ozon_order_nr ."</a>";
+    }
+    public static function getCustomerId($chatData)
+    {
+        foreach ($chatData['users'] as $user){
+            if ($user['type'] == 'customer'){
+                return $user['id'];
+            }
+        }
+    }
 }

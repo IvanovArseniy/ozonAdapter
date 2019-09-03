@@ -13,7 +13,7 @@ return [
     'ozon_base_url' => 'https://api-seller.ozon.ru',
 
 
-
+    'dev_dropship_url' => 'http://dev.dropshipp.io',
     'eddy_base_url' => 'https://mallmycom.helpdeskeddy.com/api/v2',
     'eddy_get_tickets_url' => '/tickets/',
     'eddy_get_tickets_fields_url' => '/custom_fields/',

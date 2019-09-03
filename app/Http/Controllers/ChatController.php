@@ -17,7 +17,6 @@ use vendor\project\StatusTest;
 class ChatController extends BaseController
 {
     public function SyncChat(OzonService $os, EddyService $es){
-        //$currentEddyTickets = json_decode($es->getTickets(['status_list'=>'open','search'=>'Ozon order number','owner_list'=>'2116']),1);
         $chatAnswer = json_decode($os->getChats(),1);
         $chatList = $chatAnswer['result'];
         foreach ($chatList as $chatItem)
@@ -42,10 +41,8 @@ class ChatController extends BaseController
                         }
                         $isMessageAdded = $es->addMessage($ticket->eddy_ticket_id, $chatMessage['text'],$chatMessage['file']);
                     }
-
                     $es::updateRegisteredTicket($ticket->eddy_ticket_id,['last_added_message_id'=>$chatMessage['id']]);;
                 }
-
                 return;
             }
 

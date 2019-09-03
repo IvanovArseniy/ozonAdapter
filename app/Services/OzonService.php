@@ -2544,7 +2544,7 @@ class OzonService
     }
 
     public function getChats(){
-        $chatList = $this->sendData('/v1/chat/list',['page_size'=>100,/*'chat_id_list'=>['867d9798-45ab-46f6-bc7e-3d5d78abc2a5']*/]);
+        $chatList = $this->sendData('/v1/chat/list',['page_size'=>100,'chat_id_list'=>[/*'c7da6dab-7e78-4bdb-95f3-b6dd67ea69a5'*/'867d9798-45ab-46f6-bc7e-3d5d78abc2a5']]);
         return $chatList['response'];
     }
     public function getChatMessages($chatId, $messageId = null, $limit = null){
