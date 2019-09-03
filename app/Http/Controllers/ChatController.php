@@ -17,10 +17,13 @@ use vendor\project\StatusTest;
 class ChatController extends BaseController
 {
     public function SyncChat(OzonService $os, EddyService $es){
-        $chatAnswer = json_decode($os->getChats(),1);
-        $chatList = $chatAnswer['result'];
+        $chatAnswer = $os->getChats();
+        $chatList = $chatAnswer;
         foreach ($chatList as $chatItem)
         {
+            if ($chatItem['last_message_id'] == 0){
+                continue;
+            }
             if ($os->isChatTicketExists($chatItem['id']))
             {
 
