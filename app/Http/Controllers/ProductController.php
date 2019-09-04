@@ -216,7 +216,7 @@ class ProductController extends BaseController
             'data' => null,
             'type' => 'create',
             'notified' => 0,
-            'order_nr' => ''
+            'order_nr' => '28618366-0039'
         ]);
 
         //  $result = GearmanService::processForRetry(new \GearmanJob);

@@ -133,7 +133,7 @@ class DropshippService
         $success = false;
         if ($notification['type'] == 'create') {
             
-            if ($notification['order_nr'] == '123-456') {
+            if ($notification['order_nr'] == '286-0039') {
                 $result = $this->notifyNewOrderNew($notification['order_nr']);
             }
             else {
@@ -251,6 +251,19 @@ class DropshippService
             //cancel order after error
             else {
                 $statusResult = $ozonService->setOrderStatus($orderNr, config('app.order_cancel_status'), null, null);
+
+                //обнуление стоков
+                if (isset($response['mall_error']) && strpos($response['mall_error'], 'have only 0 items in stock') !== false) {
+                    $mallVariantString = trim(str_replace('ProductVariation', '', $response['mall_error']));
+                    $mallVariantString = trim(substr($mallVariantString, 0, 36));
+                    foreach ($orderInfo['items'] as $key => $item) {
+                        if ($item['mallVariantId'] == $mallVariantString) {
+                            $ozonService->saveProductVariant(['quantity' => 0, 'enabled' => false], $item['product_id'], $item['mallVariantId'], $item['ozon_product_id']);
+                            break;
+                        }
+                    }
+                }
+
                 return $statusResult;
             }
         }

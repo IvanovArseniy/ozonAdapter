@@ -2329,6 +2329,7 @@ class OzonService
                     'product_id' => $productId,
                     'mallVariantId' => $mallVariantId,
                     'item_id' => $item['item_id'],
+                    'ozon_product_id' => $item['product_id'],
                     'quantity' => $item['quantity'],
                     'offer_id' => $item['offer_id'],
                     'price' => $item['price'],
@@ -2394,6 +2395,7 @@ class OzonService
             array_push($response['items'], [
                 'item_id' => $item['item_id'],
                 'product_id' => $item['product_id'],
+                'ozon_product_id' => $item['ozon_product_id'],
                 'mallVariantId' => $item['mallVariantId'],
                 'price' => $item['price'],
                 'quantity' => $item['quantity'],
