@@ -53,6 +53,10 @@ class ChatController extends BaseController
 
             sleep(1);
             $ticket = $es->addTicket($chatItem);
+            if (isset($ticket['errors'])){
+                Log::info('addTicket error: ' . $chatItem['id']);
+                continue;
+            }
             $newTicketsCount += 1;
             $es->registerTicketInDb($chatItem,$ticket['data']);
             while (true)
@@ -70,14 +74,17 @@ class ChatController extends BaseController
                 $chatMessages = $os->getChatMessages($chatItem['id'],$exTicket->last_added_message_id,10);
                 if (!array_key_exists('errors',$ticket))
                 {
-                    foreach ($chatMessages['result'] as $chatMessage)
+                    if (is_array($chatMessages) && array_key_exists('result', $chatMessages))
                     {
-                        if (empty($chatMessage)){
-                            continue;
+                        foreach ($chatMessages['result'] as $chatMessage)
+                        {
+                            if (empty($chatMessage)){
+                                continue;
+                            }
+                            $isMessageAdded = $es->addMessage($ticket['data']['id'], $chatMessage['text'],$chatMessage['file']);
                         }
-                        $isMessageAdded = $es->addMessage($ticket['data']['id'], $chatMessage['text'],$chatMessage['file']);
+                        $es::updateRegisteredTicket($exTicket->eddy_ticket_id,['last_added_message_id'=>$chatMessage['id']]);;
                     }
-                    $es::updateRegisteredTicket($exTicket->eddy_ticket_id,['last_added_message_id'=>$chatMessage['id']]);;
                 }
                 else{
                     Log::info('Add ticket error: ' . print_r($ticket['errors']));
