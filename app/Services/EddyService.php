@@ -72,13 +72,39 @@ class EddyService
         $fieldsResponse = $this->sendData($this->getTicketsFieldsUrl);
         return $fieldsResponse;
     }
-
+    public function getTicketMessages($ticketId)
+    {
+        $url = str_replace('{ticketId}', $ticketId, $this->addMessageUrl );
+        $currentPage = 1;
+        $totalPages = 1;
+        $result = [];
+        while ($currentPage <= $totalPages)
+        {
+            $getMessagesResponse = json_decode( $this->sendData($url, ['page'=>$currentPage],false),1);
+            foreach ($getMessagesResponse['data'] as $dataItem)
+            {
+                $result[] = $dataItem;
+            }
+            $currentPage ++;
+            $totalPages = $getMessagesResponse['pagination']['total_pages'];
+        }
+        $getMessagesResponse['result'] = $result;
+        return $getMessagesResponse;
+    }
     public function addTicket($chatData){
         $eddyData = self::convertChatData($chatData);
         $addTicketResponse = json_decode($this->sendData($this->addTicketUrl,$eddyData,true),1);
         return $addTicketResponse;
     }
 
+    public function getRegisteredTickets()
+    {
+        $tickets = app('db')->connection('mysql')->table('chat_eddy_ticket')
+            ->where('eddy_ticket_unique_id','IXF-00846')
+            ->get()
+            ->all();
+        return $tickets;
+    }
     public function registerTicketInDb($chatData, $ticketData)
     {
         try {
@@ -138,14 +164,46 @@ class EddyService
         return $preparedData;
     }
 
+    public static function getRelatedOrders($customerId)
+    {
+        $orderResult = app('db')->connection('mysql')
+            ->table('orders')
+            ->where('ozon_order_nr', 'like', $customerId . '-%')
+            ->where('deleted', 0)
+            ->get()
+            ->all();
+        return $orderResult;
+    }
     public static function convertChatData($chatData){
+        $customerId = self::getCustomerId($chatData);
+        $customerOrders = self::getRelatedOrders($customerId);
+        $ticketDescriptionOrders = [];
+        foreach ($customerOrders as $customerOrder)
+        {
+            array_push($ticketDescriptionOrders, self::makeChatOrderLink($customerOrder));
+        }
         return [
-            'title' => 'Ozon order number: ' . $chatData['id'] . '_test',
-            'description' => 'Ozon order number: ' . $chatData['id'] . '_test',
+            'title' => 'Пользователь: ' . $customerId,
+            'description' => empty($ticketDescriptionOrders) ? 'Нет заказов' : 'Номера заказов Озон:' . implode("<br />",$ticketDescriptionOrders),
             'owner_id' => '2116',
 
         ];
     }
 
-
+    public static function makeChatOrderLink($orderData)
+    {
+        if (empty($orderData)){
+            return '';
+        }
+        $url = config('app.dev_dropship_url') . '/orders/?txt=' . $orderData->ozon_order_id;
+        return "<a href='{$url}'>" . $orderData->ozon_order_nr ."</a>";
+    }
+    public static function getCustomerId($chatData)
+    {
+        foreach ($chatData['users'] as $user){
+            if ($user['type'] == 'customer'){
+                return $user['id'];
+            }
+        }
+    }
 }

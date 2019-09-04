@@ -50,6 +50,14 @@ class GearmanService
         $client->doHighBackground('chatEddySync', json_encode($data));
     }
 
+    public static function eddyChatSync($data = [])
+    {
+        $client = new \GearmanClient();
+        $client->addServers(config('app.gearmman_server'));
+        $client->doHighBackground('eddyChatSync', json_encode($data));
+    }
+
+
     public static function updateProduct(\GearmanJob $job)
     {
         $data = $job->workload();
@@ -138,6 +146,14 @@ class GearmanService
         $os = new OzonService();
         $es = new EddyService();
         $cc->SyncChat($os,$es);
+    }
+    public static function syncFromEddyToChats(\GearmanJob $job)
+    {
+        $data = $job->workload();
+        $cc = new ChatController();
+        $os = new OzonService();
+        $es = new EddyService();
+        $cc->SyncChatsFromHelpdesk($os,$es);
     }
 
    public static function processForRetry(\GearmanJob $job)

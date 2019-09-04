@@ -2713,11 +2713,36 @@ class OzonService
         }
     }
 
-    public function getChats(){
-        $chatList = $this->sendData('/v1/chat/list',['page_size'=>100]);
-        return $chatList['response'];
+    public function getChatIds()
+    {
+        $page = 1;
+        $result = [];
+        while (true){
+            $chatList = $this->sendData('/v1/chat/list',['page_size'=>null,'page'=>$page/*'chat_id_list'=>['c7da6dab-7e78-4bdb-95f3-b6dd67ea69a5','867d9798-45ab-46f6-bc7e-3d5d78abc2a5']*/]);
+            $response = json_decode($chatList['response'],1);
+            if (empty($response['result'])){
+                break;
+            }
+            foreach ($response['result'] as $responseItem)
+            {
+                if ($responseItem['last_message_id'] > 0)
+                {
+                    array_push($result,$responseItem);
+                }
+
+            }
+            $page ++;
+        }
+        return array_column($result,'id') ;
     }
-    public function getChatMessages($chatId, $messageId = null, $limit = 5){
+    public function getChats(){
+        $page = 1;
+        $ids = $this->getChatIds();
+        $chatList = $this->sendData('/v1/chat/list',['page_size'=>50,'page'=>$page, 'chat_id_list'=>$ids]);
+        $response = json_decode($chatList['response'],1);
+        return $response['result'];
+    }
+    public function getChatMessages($chatId, $messageId = null, $limit = null){
         $messageData = $this->sendData('/v1/chat/updates',['chat_id'=>$chatId,'from_message_id'=>$messageId, 'limit'=>$limit]);
         return json_decode($messageData['response'],1);
     }
@@ -2728,7 +2753,11 @@ class OzonService
             ->first();
         return $chatTicket ? $chatTicket->id > 0 : false;
     }
-
+    public function addChatMessage($chatId,$text)
+    {
+        $isMessageAdded = $this->sendData('/v1/chat/send/message',['chat_id'=>$chatId,'text'=>strip_tags($text)]);
+        return $isMessageAdded;
+    }
     ////Common
 
 
