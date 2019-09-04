@@ -211,8 +211,13 @@ class ProductController extends BaseController
         // // $ozonService = new OzonService();
         // // $processProductResult = $ozonService->processProductToOzon(['mall_variant_id' => '8f350454-54b7-45fb-ae95-6c3834bf4281']);
 
-        // // $dropshippService = new DropshippService();
-        // // $result = $dropshippService->test();
+        $dropshippService = new DropshippService();
+        $result = $dropshippService->notifyOrder([
+            'data' => null,
+            'type' => 'decline',
+            'notified' => 0,
+            'order_nr' => ''
+        ]);
 
         //  $result = GearmanService::processForRetry(new \GearmanJob);
 
@@ -223,17 +228,6 @@ class ProductController extends BaseController
 
         // // $ozonService = new OzonService();
         // // $processProductResult = $ozonService->sendStockAndPriceAndEnabledForProduct($product);        
-        
- 
-        $timerStart = $milliseconds = round(microtime(true) * 1000);
-        sleep(5);
-        $timerEnd = $milliseconds = round(microtime(true) * 1000);
-        $t = ($timerEnd - $timerStart);
-
-
-        $result = [
-            'timer1' => $t
-        ];
 
         return response()->json($result);
     }
