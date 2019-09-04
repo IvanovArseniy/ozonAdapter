@@ -214,7 +214,7 @@ class ProductController extends BaseController
         $dropshippService = new DropshippService();
         $result = $dropshippService->notifyOrder([
             'data' => null,
-            'type' => 'decline',
+            'type' => 'create',
             'notified' => 0,
             'order_nr' => ''
         ]);
