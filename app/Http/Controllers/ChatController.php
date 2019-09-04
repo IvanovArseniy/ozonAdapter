@@ -13,30 +13,32 @@ use App\Services\GearmanService;
 use App\Services\OzonService;
 use Laravel\Lumen\Routing\Controller as BaseController;
 use vendor\project\StatusTest;
+use Log;
 
 class ChatController extends BaseController
 {
     public function SyncChat(OzonService $os, EddyService $es){
+        if (file_exists(storage_path() . '/app/chatsync.lock')){
+            return 0;
+        }
+        file_put_contents(storage_path() . '/app/chatsync.lock', 'Start');
         $chatAnswer = $os->getChats();
         $chatList = $chatAnswer;
+        $newTicketsCount = 0;
+        Log::info('Chats count getted: ' . count($chatList));
         foreach ($chatList as $chatItem)
         {
-            if ($chatItem['last_message_id'] == 0){
-                continue;
-            }
             if ($os->isChatTicketExists($chatItem['id']))
             {
-
                 while (true)
                 {
                     $ticket = $es::getByExistingChatId($chatItem['id']);
-
                     if ($chatItem['last_message_id'] == $ticket->last_added_message_id)
                     {
                         break;
                     }
+                    $chatMessages = $os->getChatMessages($chatItem['id'],$ticket->last_added_message_id,10);
 
-                    $chatMessages = $os->getChatMessages($chatItem['id'],$ticket->last_added_message_id,3);
                     foreach ($chatMessages['result'] as $chatMessage)
                     {
                         if (empty($chatMessage)){
@@ -46,19 +48,26 @@ class ChatController extends BaseController
                     }
                     $es::updateRegisteredTicket($ticket->eddy_ticket_id,['last_added_message_id'=>$chatMessage['id']]);;
                 }
-                return;
+                continue;
             }
 
+            sleep(1);
             $ticket = $es->addTicket($chatItem);
+            $newTicketsCount += 1;
             $es->registerTicketInDb($chatItem,$ticket['data']);
-
             while (true)
             {
+                sleep(1);
                 $exTicket = $es::getByExistingChatId($chatItem['id']);
+                if ($exTicket == null || !is_object($exTicket))
+                {
+                    Log::info('Bad exTicket: ' . $chatItem['id']);
+                    continue;
+                }
                 if ($exTicket->last_added_message_id == $chatItem['last_message_id']){
                     break;
                 }
-                $chatMessages = $os->getChatMessages($chatItem['id'],$exTicket->last_added_message_id,3);
+                $chatMessages = $os->getChatMessages($chatItem['id'],$exTicket->last_added_message_id,10);
                 if (!array_key_exists('errors',$ticket))
                 {
                     foreach ($chatMessages['result'] as $chatMessage)
@@ -70,10 +79,21 @@ class ChatController extends BaseController
                     }
                     $es::updateRegisteredTicket($exTicket->eddy_ticket_id,['last_added_message_id'=>$chatMessage['id']]);;
                 }
+                else{
+                    Log::info('Add ticket error: ' . print_r($ticket['errors']));
+                    continue;
+                }
             }
         }
+        $unlink = unlink(storage_path() . '/app/chatsync.lock');
+        Log::info('New tickets count: ' . $newTicketsCount);
+        Log::info('Unlink in 83: ' . $unlink);
+        return 0;
     }
     public function SyncChatsFromHelpdesk(OzonService $os, EddyService $es){
+        if (file_exists(storage_path() . '/app/chatsync.lock')){
+            return 0;
+        }
         $chatAnswer = json_decode($os->getChats(),1);
         $chatList = $chatAnswer['result'];
         foreach ($chatList as $chatItem)

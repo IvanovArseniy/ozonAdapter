@@ -2702,7 +2702,8 @@ class OzonService
         }
     }
 
-    public function getChats(){
+    public function getChatIds()
+    {
         $page = 1;
         $result = [];
         while (true){
@@ -2713,11 +2714,22 @@ class OzonService
             }
             foreach ($response['result'] as $responseItem)
             {
-                array_push($result,$responseItem);
+                if ($responseItem['last_message_id'] > 0)
+                {
+                    array_push($result,$responseItem);
+                }
+
             }
             $page ++;
         }
-        return $result;
+        return array_column($result,'id') ;
+    }
+    public function getChats(){
+        $page = 1;
+        $ids = $this->getChatIds();
+        $chatList = $this->sendData('/v1/chat/list',['page_size'=>50,'page'=>$page, 'chat_id_list'=>$ids]);
+        $response = json_decode($chatList['response'],1);
+        return $response['result'];
     }
     public function getChatMessages($chatId, $messageId = null, $limit = null){
         $messageData = $this->sendData('/v1/chat/updates',['chat_id'=>$chatId,'from_message_id'=>$messageId, 'limit'=>$limit]);
