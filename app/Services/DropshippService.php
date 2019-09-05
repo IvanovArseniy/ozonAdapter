@@ -41,86 +41,6 @@ class DropshippService
         return $url;
     }
 
-    public function notifyOrders()
-    {
-        $notifications = app('db')->connection('mysql')
-            ->select('select no.id as id, no.type as type, no.data as data, o.ozon_order_id as ozonOrderId, o.ozon_order_nr as ozonOrderNr from order_notification no
-                left join orders o on o.ozon_order_id = no.order_id
-                where notified = 0 order by no.id asc limit 1');
-
-        $notificationResult = [];
-        $created = 0;
-        $approved = 0;
-        $declined = 0;
-        foreach ($notifications as $key => $notification) {
-            $success = false;
-            if ($notification->type == 'create') {
-                $result = $this->notifyNewOrder($notification->ozonOrderNr);
-                if (!isset($result['error'])) {
-                    $created++;
-                    $notificationResult['created'] = $created;
-                    $success = true;
-                }
-            }
-            if ($notification->type == 'update') {
-                $result = $this->notifyExistedOrder($notification->ozonOrderNr, $notification->data);
-                if (!isset($result['error'])) {
-                    array_push($notificationResult, $result);
-                    $success = true;
-                }
-            }
-            elseif ($notification->type == 'delete') {
-                $result = $this->notifyDeletedOrder($notification->ozonOrderNr);
-                if (!isset($result['error'])) {
-                    array_push($notificationResult, $result);
-                    $success = true;
-                }
-            }
-
-            if ($notification->type == 'approve') {
-                $result = $this->ApproveOrder($notification->ozonOrderNr);
-                if (!isset($result['error'])) {
-                    $approved++;
-                    $notificationResult['approved'] = $approved;
-                    $success = true;
-                }
-            }
-
-            if ($notification->type == 'decline') {
-                $result = $this->DeclineOrder($notification->ozonOrderNr);
-                if (!isset($result['error'])) {
-                    $declined++;
-                    $notificationResult['declined'] = $declined;
-                    $success = true;
-                }
-            }
-
-            app('db')->connection('mysql')->table('order_notification')
-                ->where('id', $notification->id)
-                ->update(['notified' => 1]);     
-
-            if (!$success) {
-                $orderNotificationResult = app('db')->connection('mysql')->table('order_notification')
-                    ->where('order_id', $notification->ozonOrderId)
-                    ->where('type', $notification->type)
-                    ->where('notified', 0)
-                    ->first();
-                if (!$orderNotificationResult) {
-                    app('db')->connection('mysql')->table('order_notification')
-                    ->insert([
-                        'data' => null,
-                        'type' => $notification->type,
-                        'notified' => 0,
-                        'order_id' => $notification->ozonOrderId
-                    ]);   
-                }
-            }
-
-        }
-
-        return $notificationResult;
-    }
-
     public function notifyOrder($notification)
     {
         if (!is_array($notification)) {
@@ -133,12 +53,7 @@ class DropshippService
         $success = false;
         if ($notification['type'] == 'create') {
             
-            if ($notification['order_nr'] == '286-0039') {
-                $result = $this->notifyNewOrderNew($notification['order_nr']);
-            }
-            else {
-                $result = $this->notifyNewOrder($notification['order_nr']);
-            }
+            $result = $this->notifyNewOrder($notification['order_nr']);
             if (!isset($result['error'])) {
                 $success = true;
             }
@@ -193,30 +108,6 @@ class DropshippService
     }
 
     protected function notifyNewOrder($orderNr)
-    {
-        Log::info($this->interactionId . ' => New order:' . json_encode($orderNr));
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl)));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-        Log::info($this->interactionId . ' => Url: ' . $this->baseUrl . $this->addToken(str_replace('{store_num}', $orderNr, $this->orderUrl)));
-        $response = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        Log::info($this->interactionId . ' => Notify new order: ' . $response);
-
-        $response = json_decode($response, true);
-
-        if (isset($response['error']) && $http_code == 200) {
-            $ozonService = new OzonService();
-            $statusResult = $ozonService->setOrderStatus($orderNr, config('app.order_cancel_status'), null, null);
-            return $statusResult;
-        }
-
-        return $response;
-    }
-
-    protected function notifyNewOrderNew($orderNr)
     {
         Log::info($this->interactionId . ' => New order:' . json_encode($orderNr, JSON_UNESCAPED_UNICODE));
         $ozonService = new OzonService();
