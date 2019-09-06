@@ -114,7 +114,7 @@ class ChatController extends BaseController
 
 
         Log::info('From Ozon to Eddy: chats count = ' . count($chatAnswer));
-        $chatList = $chatAnswer['result'];
+        $chatList = $chatAnswer;
         foreach ($chatList as $chatItem)
         {
             $exTicket = $es::getByExistingChatId($chatItem['id']);
