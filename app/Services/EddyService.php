@@ -184,7 +184,7 @@ class EddyService
         }
         return [
             'title' => 'Пользователь: ' . $customerId,
-            'description' => empty($ticketDescriptionOrders) ? 'Нет заказов' : 'Номера заказов Озон:' . implode("<br />",$ticketDescriptionOrders),
+            'description' => empty($ticketDescriptionOrders) ? 'Нет заказов' : 'Номера заказов Озон: ' . implode("<br />",$ticketDescriptionOrders),
             'owner_id' => '2116',
 
         ];
@@ -195,7 +195,7 @@ class EddyService
         if (empty($orderData)){
             return '';
         }
-        $url = config('app.dev_dropship_url') . '/orders/?txt=' . $orderData->ozon_order_id;
+        $url = config('app.dev_dropship_url') . '/orders/?txt=' . $orderData->ozon_order_nr;
         return "<a href='{$url}'>" . $orderData->ozon_order_nr ."</a>";
     }
     public static function getCustomerId($chatData)
