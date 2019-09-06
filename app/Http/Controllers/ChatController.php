@@ -99,12 +99,12 @@ class ChatController extends BaseController
     }
     public function SyncChatsFromHelpdesk(OzonService $os, EddyService $es){
         Log::info('From Ozon to Eddy: start');
-        file_put_contents(storage_path() . '/app/chatsync_ozon.lock', 'Start');
+
         if (file_exists(storage_path() . '/app/chatsync.lock')){
             Log::info('From Ozon to Eddy: exit');
             return 0;
         }
-
+        file_put_contents(storage_path() . '/app/chatsync_ozon.lock', 'Start');
         $chats = $os->getChats();
         if (!is_array($chats)){
             $chatAnswer = json_decode($chats,1);
