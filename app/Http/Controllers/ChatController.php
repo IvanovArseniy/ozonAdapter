@@ -98,10 +98,13 @@ class ChatController extends BaseController
         return 0;
     }
     public function SyncChatsFromHelpdesk(OzonService $os, EddyService $es){
+        Log::info('From Ozon to Eddy: start');
         if (file_exists(storage_path() . '/app/chatsync.lock')){
+            Log::info('From Ozon to Eddy: exit');
             return 0;
         }
         $chatAnswer = json_decode($os->getChats(),1);
+        Log::info('From Ozon to Eddy: chats count = ' . count($chatAnswer));
         $chatList = $chatAnswer['result'];
         foreach ($chatList as $chatItem)
         {
@@ -111,9 +114,11 @@ class ChatController extends BaseController
             $unsyncedMessagesCount = count($exTicketMessages['result']) - count($chatMessages['result']);
             if ($unsyncedMessagesCount > 0)
             {
+                Log::info('From Ozon to Eddy: unsyncedMessagesCount = ' . $unsyncedMessagesCount);
                 for ($i = $unsyncedMessagesCount - 1; $i >= 0; $i--)
                 {
                     $isMessageAdded = $os->addChatMessage($chatItem['id'],$exTicketMessages['result'][$i]['text']);
+                    Log::info('From Ozon to Eddy: add message to ' . $chatItem['id']);
                 }
                 $chatMessagesNew = $os->getChatMessages($chatItem['id']);
                 $lastAddedMessageId = $chatMessagesNew['result'][count($chatMessagesNew['result']) - 1]['id'];
