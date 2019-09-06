@@ -1455,7 +1455,7 @@ class OzonService
         else return $productVariant;
     }
 
-    protected function saveProductVariant($product, $productId, $mallVariantId, $ozonProductId)
+    public function saveProductVariant($product, $productId, $mallVariantId, $ozonProductId)
     {
         if (!is_null($ozonProductId)) {
             $message = ['product_id' => $ozonProductId];

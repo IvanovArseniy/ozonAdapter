@@ -214,9 +214,9 @@ class ProductController extends BaseController
         $dropshippService = new DropshippService();
         $result = $dropshippService->notifyOrder([
             'data' => null,
-            'type' => 'decline',
+            'type' => 'create',
             'notified' => 0,
-            'order_nr' => '28618366-0039'
+            'order_nr' => '36108261-0002'
         ]);
 
         //  $result = GearmanService::processForRetry(new \GearmanJob);
