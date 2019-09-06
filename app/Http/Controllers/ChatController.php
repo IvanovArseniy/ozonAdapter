@@ -103,7 +103,16 @@ class ChatController extends BaseController
             Log::info('From Ozon to Eddy: exit');
             return 0;
         }
-        $chatAnswer = json_decode($os->getChats(),1);
+
+        $chats = $os->getChats();
+        if (!is_array($chats)){
+            $chatAnswer = json_decode($chats,1);
+        }
+        else{
+            $chatAnswer = $chats;
+        }
+
+
         Log::info('From Ozon to Eddy: chats count = ' . count($chatAnswer));
         $chatList = $chatAnswer['result'];
         foreach ($chatList as $chatItem)
@@ -125,6 +134,7 @@ class ChatController extends BaseController
                 $es::updateRegisteredTicket($exTicket->eddy_ticket_id,['last_added_message_id'=>$lastAddedMessageId]);;
             }
         }
+        Log::info('From Ozon to Eddy: end');
     }
     public static function handle()
     {
