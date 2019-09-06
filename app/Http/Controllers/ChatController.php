@@ -18,7 +18,7 @@ use Log;
 class ChatController extends BaseController
 {
     public function SyncChat(OzonService $os, EddyService $es){
-        if (file_exists(storage_path() . '/app/chatsync.lock')){
+        if ( file_exists(storage_path() . '/app/chatsync.lock') || file_exists(storage_path() . '/app/chatsync_ozon.lock') ){
             return 0;
         }
         file_put_contents(storage_path() . '/app/chatsync.lock', 'Start');
@@ -99,6 +99,7 @@ class ChatController extends BaseController
     }
     public function SyncChatsFromHelpdesk(OzonService $os, EddyService $es){
         Log::info('From Ozon to Eddy: start');
+        file_put_contents(storage_path() . '/app/chatsync_ozon.lock', 'Start');
         if (file_exists(storage_path() . '/app/chatsync.lock')){
             Log::info('From Ozon to Eddy: exit');
             return 0;
@@ -134,6 +135,7 @@ class ChatController extends BaseController
                 $es::updateRegisteredTicket($exTicket->eddy_ticket_id,['last_added_message_id'=>$lastAddedMessageId]);;
             }
         }
+        $unlink_ozon = unlink(storage_path() . '/app/chatsync_ozon.lock');
         Log::info('From Ozon to Eddy: end');
     }
     public static function handle()
