@@ -81,6 +81,10 @@ class EddyService
         while ($currentPage <= $totalPages)
         {
             $getMessagesResponse = json_decode( $this->sendData($url, ['page'=>$currentPage],false),1);
+            if (!is_array($getMessagesResponse['data']) || empty($getMessagesResponse['data']))
+            {
+                continue;
+            }
             foreach ($getMessagesResponse['data'] as $dataItem)
             {
                 $result[] = $dataItem;
