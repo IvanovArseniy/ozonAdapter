@@ -119,6 +119,10 @@ class ChatController extends BaseController
         foreach ($chatList as $chatItem)
         {
             $exTicket = $es::getByExistingChatId($chatItem['id']);
+            if (!is_object($exTicket))
+            {
+                continue;
+            }
             $exTicketMessages = $es->getTicketMessages($exTicket->eddy_ticket_id);
             $chatMessages = $os->getChatMessages($chatItem['id']);
             $unsyncedMessagesCount = count($exTicketMessages['result']) - count($chatMessages['result']);
