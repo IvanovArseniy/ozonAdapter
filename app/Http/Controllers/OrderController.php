@@ -7,6 +7,7 @@ use Laravel\Lumen\Routing\Controller as BaseController;
 use Illuminate\Http\Request as Request;
 use App\Services\OzonService;
 use App\Services\DropshippService;
+use App\Services\GearmanService;
 
 class OrderController extends BaseController
 {
@@ -17,6 +18,15 @@ class OrderController extends BaseController
         $result = $ozonService->getOrderInfoCommon($orderNr);
         Log::info($interactionId . ' => Get order info result:'. json_encode($result));
         return response()->json($result);
+    }
+
+    public function getLastOrder(OzonService $ozonService)
+    {
+        $interactionId = $ozonService->getInteractionId();
+        Log::info($interactionId . ' => Get last order');
+        $order = $ozonService->getLastOrder();
+        Log::info($interactionId . ' => Get last order result: ' . json_encode($order));
+        return response()->json($order);
     }
 
     public function setOrderStatus(OzonService $ozonService, Request $request, $orderNr)
@@ -77,5 +87,11 @@ class OrderController extends BaseController
         Log::info($interactionId . ' => Set order nr');
         $result = $ozonService->setOrderNr();
         return response()->json($result);
+    }
+
+    public function checkApproved()
+    {
+        $success = GearmanService::addCheckApprovedOrders([]);
+        return response()->json(['result' => $success]);
     }
 }

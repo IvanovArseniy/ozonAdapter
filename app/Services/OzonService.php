@@ -3,6 +3,7 @@
 namespace App\Services;
 use Log;
 use App\Services\DropshippService;
+use App\Services\NotificationService;
 use DateTime;
 
 class OzonService
@@ -19,6 +20,7 @@ class OzonService
     protected $updatePricesUrl;
     protected $productListUrl;
 
+    protected $ordersUrl;
     protected $orderListUrl;
     protected $orderInfoUrl;
     protected $approveOrderUrl;
@@ -45,6 +47,7 @@ class OzonService
         $this->updatePricesUrl = config('app.update_productprices_url');
         $this->productListUrl = config('app.ozon_productlist_url');
     
+        $this->ordersUrl = config('app.ozon_orders_url');
         $this->orderListUrl = config('app.ozon_orderlist_url');
         $this->orderInfoUrl = config('app.ozon_orderinfo_url');
         $this->approveOrderUrl = config('app.ozon_approveorder_url');
@@ -2106,6 +2109,55 @@ class OzonService
 
 
     ////Orders
+    public function getLastOrder()
+    {
+        $halfHourAgo = new \DateTime();
+        $halfHourAgo->sub(new \DateInterval('PT30M'));
+        $halfHourAgo->sub(new \DateInterval('PT3H'));
+        $since = new \DateTime();
+        $since->sub(new \DateInterval('PT5H'));
+        $data = [
+            'since' => $since->format('Y-m-d') . 'T' . $since->format('H:i:s') .'.000Z',
+            'to' => $halfHourAgo->format('Y-m-d') . 'T' . $halfHourAgo->format('H:i:s') .'.999Z',
+            //'since' => $since->format('Y-m-d\TH:i:s.u'),
+            //'to' => $to->format('Y-m-d\TH:i:s.u'),
+            'statuses' => [config('app.ozon_order_status.AWAITING_APPROVE')],
+            'delivery_schema' => 'crossborder',
+            'page' => 1,
+            'page_size' => 100
+        ];
+        $response = $this->sendData($this->ordersUrl, $data);
+        $response = $response['response'];
+        $result = json_decode($response, true);
+
+        if (isset($result['result']) && isset($result['result']['orders']) && isset($result['result']['orders'][0])) {
+            $orders = $result['result']['orders'];
+            usort($orders, function($o1, $o2) {
+                return intval($o2['order_id']) - intval($o1['order_id']);
+            });
+            return $this->getOrderInfoById($orders[0]['order_id']);
+        }
+        else return ['error' => 'Error while getting last order!'];
+    }
+
+    public function checkApprovedOrders()
+    {
+        $orders = app('db')->connection('mysql')
+            ->select('select ozon_order_id as ozonOrderId, ozon_order_nr as ozonOrderNr from orders where create_date < (CURDATE() - INTERVAL 7 DAY) and status = "' . config('app.ozon_order_status.AWAITING_PACKAGING') . '"');
+
+        if ($orders) {
+            $notificationService = new NotificationService();
+            foreach ($orders as $key => $order) {
+                $notificationResult = $notificationService->sendWeekAgoOrderEmail($order->ozonOrderNr);
+                if (isset($notificationResult['sendCount'])) {
+                    app('db')->connection('mysql')->table('orders')
+                        ->where('ozon_order_id', $order->ozonOrderId)
+                        ->update(['status' => config('app.ozon_order_status.AWAITING_PACKAGING_TOO_LONG')]);
+                }
+            }
+        }
+    }
+
     public function getOrderList()
     {
         $data = [
@@ -2551,6 +2603,12 @@ class OzonService
                     $response = $response['response'];
                     $response = json_decode($response, true);
                     Log::info($this->interactionId . ' => Ship ozon order result: ' . json_encode($response, JSON_UNESCAPED_UNICODE));
+
+                    if (true) {
+                        app('db')->connection('mysql')->table('orders')
+                        ->where('ozon_order_id', $order['ozon_order_id'])
+                        ->update(['status' => config('app.ozon_order_status.DELIVERING')]);
+                    }
                 }
             }
         }
@@ -2784,8 +2842,8 @@ class OzonService
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        Log::debug('Response http code:' . $http_code);
-        Log::debug('Response data:' . json_encode($response));
+        Log::debug($this->interactionId . ' => Response http code:' . $http_code);
+        Log::debug($this->interactionId . ' => Response data:' . json_encode($response));
         
         return [
             'http_code' => $http_code,

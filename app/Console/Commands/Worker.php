@@ -22,6 +22,7 @@ class Worker extends Command
         $worker->addFunction('processStockAndPrice', '\App\Services\GearmanService::updateProduct');
         $worker->addFunction('chatEddySync', '\App\Services\GearmanService::syncChatsWithEddy');
         $worker->addFunction('eddyChatSync', '\App\Services\GearmanService::syncFromEddyToChats');
+        $worker->addFunction('ceckApprovedOrders', '\App\Services\GearmanService::checkApprovedOrders');
 
         while (1) {
             $worker->work();

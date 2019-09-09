@@ -44,6 +44,8 @@ $router->group(['prefix' => '1/tech', 'middleware' => 'auth'], function() use ($
     $router->get('/product/setstock', 'ProductController@setStock');
     $router->get('/order/setOrderNr', 'OrderController@setOrderNr');
     $router->get('/order/notify', 'OrderController@sendOrderNotifications');
+    $router->get('/orders/last', 'OrderController@getLastOrder');
+    $router->get('/orders/checkApproved', 'OrderController@checkApproved');
 
     $router->get('/product/gearman', 'ProductController@gearmanTry');
     $router->get('/queue/addForRetry', 'QueueController@addForRetry');

@@ -33,6 +33,7 @@ return [
     'ozon_productlist_url' => '/v1/product/list',
     'ozon_product_group_attribute' => 8292,
 
+    'ozon_orders_url' => '/v1/order/list',
     'ozon_orderlist_url' => '/v1/order/unfulfilled',
     'ozon_orderinfo_url' => '/v1/order/{orderId}?translit=true',
     'ozon_approveorder_url' => '/v1/order/items/approve/crossborder',
@@ -47,6 +48,7 @@ return [
 
     'dropshipp_base_url' => 'http://dev.dropshipp.io',
     'dropshipp_token_url' => '?-apikey={api_key}&token={owner_token}',
+    'dropshipp_notification_url' => '/api/v1/notification/1',
     //'dropshipp_order_url' => '/api/v1/orders/{owner_id}/{store_num}'
     'dropshipp_order_url' => '/api/v1/orders/1/{store_num}',
     'dropshipp_order_url_action' => '/api/v1/orders/1/{store_num}/{action}',
@@ -70,7 +72,8 @@ return [
         'DELIVERED' => 'DELIVERED',
         //'CANCELLED' => 'WILL_NOT_DELIVER',
         'CANCELLED' => 'RETURNED',
-        'DELIVERED' => 'READY_FOR_PICKUP'
+        'DELIVERED' => 'READY_FOR_PICKUP',
+        'AWAITING_PACKAGING_TOO_LONG' => 'AWAITING_PACKAGING_TOO_LONG'
     ],
 
     'order_item_status' => [

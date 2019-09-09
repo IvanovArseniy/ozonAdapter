@@ -34,6 +34,13 @@ class GearmanService
         $client->addServers(config('app.gearmman_server'));
         $client->doBackground('setOzonProductId', json_encode($data));
     }
+
+    public static function addCheckApprovedOrders($data)
+    {
+        $client = new \GearmanClient();
+        $client->addServers(config('app.gearmman_server'));
+        $client->doHighBackground('checkApprovedOrders', json_encode($data));
+    }
     
     public static function addForRetry($data)
     {
@@ -156,8 +163,14 @@ class GearmanService
         $cc->SyncChatsFromHelpdesk($os,$es);
     }
 
-   public static function processForRetry(\GearmanJob $job)
-   {
+    public static function checkApprovedOrders(\GearmanJob $job)
+    {
+        $ozonService = new OzonService();
+        $ozonService->checkApprovedOrders();
+    }
+
+    public static function processForRetry(\GearmanJob $job)
+    {
         $success = false;
         try {
             app('db')->connection('mysql')->table('gearman_retry_queue')
