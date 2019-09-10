@@ -135,10 +135,10 @@ class ChatController extends BaseController
             $exTicketMessages = $es->getTicketMessages($exTicket->eddy_ticket_id);
             $chatMessages = $os->getChatMessages($chatItem['id']);
             $unsyncedMessagesCount = (count($exTicketMessages['result']) - 1) - count($chatMessages['result']);
-            if ($unsyncedMessagesCount > 0 && array_key_exists('result',$exTicketMessages))
+            if ($unsyncedMessagesCount > -1 && array_key_exists('result',$exTicketMessages))
             {
                 Log::info('From Ozon to Eddy: unsyncedMessagesCount = ' . $unsyncedMessagesCount);
-                for ($i = $unsyncedMessagesCount - 1; $i >= 0; $i--)
+                for ($i = $unsyncedMessagesCount; $i >= 0; $i--)
                 {
                     $isMessageAdded = $os->addChatMessage($chatItem['id'],$exTicketMessages['result'][$i]['text']);
                     Log::info('From Ozon to Eddy: add message to ' . $chatItem['id']);
