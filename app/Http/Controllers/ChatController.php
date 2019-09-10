@@ -134,18 +134,20 @@ class ChatController extends BaseController
             }
             $exTicketMessages = $es->getTicketMessages($exTicket->eddy_ticket_id);
             $chatMessages = $os->getChatMessages($chatItem['id']);
-            $unsyncedMessagesCount = (count($exTicketMessages['result']) - 1) - count($chatMessages['result']);
-            if ($unsyncedMessagesCount > 0 && array_key_exists('result',$exTicketMessages))
-            {
-                Log::info('From Ozon to Eddy: unsyncedMessagesCount = ' . $unsyncedMessagesCount);
-                for ($i = $unsyncedMessagesCount; $i > 0; $i--)
+            if (array_key_exists('result',$exTicketMessages)){
+                $unsyncedMessagesCount = (count($exTicketMessages['result']) - 1) - count($chatMessages['result']);
+                if ($unsyncedMessagesCount > 0)
                 {
-                    $isMessageAdded = $os->addChatMessage($chatItem['id'],$exTicketMessages['result'][$i-1]['text']);
-                    Log::info('From Ozon to Eddy: add message to ' . $chatItem['id']);
+                    Log::info('From Ozon to Eddy: unsyncedMessagesCount = ' . $unsyncedMessagesCount);
+                    for ($i = $unsyncedMessagesCount; $i > 0; $i--)
+                    {
+                        $isMessageAdded = $os->addChatMessage($chatItem['id'],$exTicketMessages['result'][$i-1]['text']);
+                        Log::info('From Ozon to Eddy: add message to ' . $chatItem['id']);
+                    }
+                    $chatMessagesNew = $os->getChatMessages($chatItem['id']);
+                    $lastAddedMessageId = $chatMessagesNew['result'][count($chatMessagesNew['result']) - 1]['id'];
+                    $es::updateRegisteredTicket($exTicket->eddy_ticket_id,['last_added_message_id'=>$lastAddedMessageId]);;
                 }
-                $chatMessagesNew = $os->getChatMessages($chatItem['id']);
-                $lastAddedMessageId = $chatMessagesNew['result'][count($chatMessagesNew['result']) - 1]['id'];
-                $es::updateRegisteredTicket($exTicket->eddy_ticket_id,['last_added_message_id'=>$lastAddedMessageId]);;
             }
         }
         $unlink_ozon = unlink(storage_path() . '/app/chatsync_ozon.lock');
