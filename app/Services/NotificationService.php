@@ -25,6 +25,14 @@ class NotificationService
         return $result;
     }
 
+    protected function addToken($url)
+    {
+        $tokenUrl = str_replace('{api_key}', config('app.dropshipp_key'), $this->tokenUrl);
+        $tokenUrl = str_replace('{owner_token}', config('app.dropshipp_owner_token'), $tokenUrl);
+        $url = $url . $tokenUrl;
+        return $url;
+    }
+
     private function sendData($data)
     {
         $ch = curl_init();

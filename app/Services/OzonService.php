@@ -2143,7 +2143,7 @@ class OzonService
     public function checkApprovedOrders()
     {
         $orders = app('db')->connection('mysql')
-            ->select('select ozon_order_id as ozonOrderId, ozon_order_nr as ozonOrderNr from orders where create_date < (CURDATE() - INTERVAL 7 DAY) and status = "' . config('app.ozon_order_status.AWAITING_PACKAGING') . '"');
+            ->select('select ozon_order_id as ozonOrderId, ozon_order_nr as ozonOrderNr from orders where create_date < (CURDATE() - INTERVAL 7 DAY) and status IN ("' . config('app.ozon_order_status.AWAITING_APPROVE') . '", "' . config('app.ozon_order_status.AWAITING_PACKAGING') . '")');
 
         if ($orders) {
             $notificationService = new NotificationService();
