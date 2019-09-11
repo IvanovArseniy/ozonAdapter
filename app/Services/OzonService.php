@@ -2604,10 +2604,19 @@ class OzonService
                     $response = json_decode($response, true);
                     Log::info($this->interactionId . ' => Ship ozon order result: ' . json_encode($response, JSON_UNESCAPED_UNICODE));
 
-                    if (true) {
+                    $nonshippedItems =  false;
+                    $orderInfo = $this->getOzonOrderInfo($order['ozon_order_id']);
+                    foreach ($orderInfo['result']['items'] as $key => $orderItem) {
+                        if ($orderItem['status'] == config('app.ozon_order_item_status.awaiting_deliver') || $orderItem['status'] == config('app.ozon_order_item_status.awaiting_approve')) {
+                            $nonshippedItems = true;
+                            break;
+                        }
+                    }
+
+                    if (!$nonshippedItems) {
                         app('db')->connection('mysql')->table('orders')
-                        ->where('ozon_order_id', $order['ozon_order_id'])
-                        ->update(['status' => config('app.ozon_order_status.DELIVERING')]);
+                            ->where('ozon_order_id', $order['ozon_order_id'])
+                            ->update(['status' => config('app.ozon_order_status.DELIVERING')]);
                     }
                 }
             }

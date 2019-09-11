@@ -72,8 +72,12 @@ return [
         'DELIVERED' => 'DELIVERED',
         //'CANCELLED' => 'WILL_NOT_DELIVER',
         'CANCELLED' => 'RETURNED',
-        'DELIVERED' => 'READY_FOR_PICKUP',
-        'AWAITING_PACKAGING_TOO_LONG' => 'AWAITING_PACKAGING_TOO_LONG'
+        'DELIVERED' => 'READY_FOR_PICKUP'
+    ],
+
+    'ozon_order_item_status' => [
+        'awaiting_approve' => 'awaiting_approve',
+        'awaiting_deliver' => 'awaiting_deliver'
     ],
 
     'order_item_status' => [
@@ -90,7 +94,9 @@ return [
     'ozon_order_status' => [
         'AWAITING_APPROVE' => 'AWAITING_APPROVE',
         'AWAITING_PACKAGING' => 'AWAITING_PACKAGING',
-        'CANCELLED' => 'CANCELLED'
+        'CANCELLED' => 'CANCELLED',
+        'DELIVERING' => 'DELIVERING',
+        'AWAITING_PACKAGING_TOO_LONG' => 'AWAITING_PACKAGING_TOO_LONG'
     ],
 
     'sync_portion' => 100,
