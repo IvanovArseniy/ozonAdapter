@@ -9,7 +9,7 @@
 namespace App\Services;
 
 use App\Services\OzonService;
-
+use Log;
 class EddyService
 {
     protected $baseUrl;
@@ -56,7 +56,7 @@ class EddyService
         $response = curl_exec($ch);
         if($response === false)
         {
-            var_dump( 'Ошибка curl: ' . curl_error($ch));
+            Log::info( 'Ошибка curl: ' . curl_error($ch));
         }
         curl_close($ch);
         return $response;

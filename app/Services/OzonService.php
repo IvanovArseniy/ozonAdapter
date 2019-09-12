@@ -2809,6 +2809,11 @@ class OzonService
         $ids = $this->getChatIds();
         $chatList = $this->sendData('/v1/chat/list',['page_size'=>50,'page'=>$page, 'chat_id_list'=>$ids]);
         $response = json_decode($chatList['response'],1);
+        if (isset($response['error']))
+        {
+            Log::info('Get chats error: ' . $response['error']['message']);
+            return false;
+        }
         return $response['result'];
     }
     public function getChatMessages($chatId, $messageId = null, $limit = null){

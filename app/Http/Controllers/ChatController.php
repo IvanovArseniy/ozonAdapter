@@ -23,6 +23,12 @@ class ChatController extends BaseController
         }
         file_put_contents(storage_path() . '/app/chatsync.lock', 'Start');
         $chatAnswer = $os->getChats();
+        if (!$chatAnswer)
+        {
+            $unlink = unlink(storage_path() . '/app/chatsync.lock');
+            Log::info('Unlink chatsynk.lock cause getChats error.');
+            return 0;
+        }
         $chatList = $chatAnswer;
         $newTicketsCount = 0;
         Log::info('Chats count getted: ' . count($chatList));
@@ -115,6 +121,12 @@ class ChatController extends BaseController
         }
         file_put_contents(storage_path() . '/app/chatsync_ozon.lock', 'Start');
         $chats = $os->getChats();
+        if (!$chats)
+        {
+            $unlink = unlink(storage_path() . '/app/chatsync_ozon.lock');
+            Log::info('Unlink chatsync_ozon.lock cause getChats error.');
+            return 0;
+        }
         if (!is_array($chats)){
             $chatAnswer = json_decode($chats,1);
         }
