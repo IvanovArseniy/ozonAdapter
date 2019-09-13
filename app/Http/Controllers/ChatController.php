@@ -44,7 +44,10 @@ class ChatController extends BaseController
                         break;
                     }
                     $chatMessages = $os->getChatMessages($chatItem['id'],$ticket->last_added_message_id,10);
-
+                    if (!array_key_exists('result',$chatMessages))
+                    {
+                        continue;
+                    }
                     foreach ($chatMessages['result'] as $chatMessage)
                     {
                         if (empty($chatMessage)){
@@ -146,7 +149,7 @@ class ChatController extends BaseController
             }
             $exTicketMessages = $es->getTicketMessages($exTicket->eddy_ticket_id);
             $chatMessages = $os->getChatMessages($chatItem['id']);
-            if (array_key_exists('result',$exTicketMessages)){
+            if (array_key_exists('result',$exTicketMessages) && array_key_exists('result',$chatMessages)){
                 $unsyncedMessagesCount = (count($exTicketMessages['result']) - 1) - count($chatMessages['result']);
                 if ($unsyncedMessagesCount > 0)
                 {
