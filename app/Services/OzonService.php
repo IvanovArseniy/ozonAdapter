@@ -2143,16 +2143,20 @@ class OzonService
     public function checkApprovedOrders()
     {
         $orders = app('db')->connection('mysql')
-            ->select('select ozon_order_id as ozonOrderId, ozon_order_nr as ozonOrderNr from orders where create_date < (CURDATE() - INTERVAL 7 DAY) and status IN ("' . config('app.ozon_order_status.AWAITING_APPROVE') . '", "' . config('app.ozon_order_status.AWAITING_PACKAGING') . '")');
+            ->select('select ozon_order_id as ozonOrderId, ozon_order_nr as ozonOrderNr from orders where update_date IS NOT NULL AND update_date < (NOW() - INTERVAL 7 DAY) and status IN ("' . config('app.ozon_order_status.AWAITING_APPROVE') . '", "' . config('app.ozon_order_status.AWAITING_PACKAGING') . '")');
 
         if ($orders) {
             $notificationService = new NotificationService();
             foreach ($orders as $key => $order) {
                 $notificationResult = $notificationService->sendWeekAgoOrderEmail($order->ozonOrderNr);
                 if (isset($notificationResult['sendCount'])) {
+                    $date = new \DateTime();
                     app('db')->connection('mysql')->table('orders')
                         ->where('ozon_order_id', $order->ozonOrderId)
-                        ->update(['status' => config('app.ozon_order_status.AWAITING_PACKAGING_TOO_LONG')]);
+                        ->update([
+                            'status' => config('app.ozon_order_status.AWAITING_PACKAGING_TOO_LONG'),
+                            'update_date' => $date->format('Y-m-d H:i:s')
+                            ]);
                 }
             }
         }
@@ -2249,9 +2253,13 @@ class OzonService
                         'order_nr' => $order->ozon_order_nr
                     ]);
 
+                    $date = new \DateTime();
                     app('db')->connection('mysql')->table('orders')
                         ->where('ozon_order_id', $order->ozon_order_id)
-                        ->update(['status' => config('app.ozon_order_status.CANCELLED')]);
+                        ->update([
+                            'status' => config('app.ozon_order_status.CANCELLED'),
+                            'update_date' => $date->format('Y-m-d H:i:s')
+                            ]);
                 }
             }
         }
@@ -2551,9 +2559,13 @@ class OzonService
                     $httpCode = $response['http_code'];
                     $response = $response['response'];
                 $response = json_decode($response, true);
+                $date = new \DateTime();
                 app('db')->connection('mysql')->table('orders')
                     ->where('ozon_order_id', $order['ozon_order_id'])
-                    ->update(['status' => config('app.ozon_order_status.AWAITING_PACKAGING')]);
+                    ->update([
+                        'status' => config('app.ozon_order_status.AWAITING_PACKAGING'),
+                        'update_date' => $date->format('Y-m-d H:i:s')
+                        ]);
                 Log::info($this->interactionId . ' => Approve ozon order result: ' . json_encode($response, JSON_UNESCAPED_UNICODE));
             }
             if(strtoupper($status) == strtoupper(config('app.order_cancel_status')) || count($toCancel) > 0)
@@ -2571,9 +2583,13 @@ class OzonService
                 $response = $response['response'];
 
                 if (strtoupper($status) == strtoupper(config('app.order_cancel_status'))) {
+                    $date = new \DateTime();
                     app('db')->connection('mysql')->table('orders')
                         ->where('ozon_order_id', $order['ozon_order_id'])
-                        ->update(['status' => config('app.ozon_order_status.CANCELLED')]);
+                        ->update([
+                            'status' => config('app.ozon_order_status.CANCELLED'),
+                            'update_date' => $date->format('Y-m-d H:i:s')
+                            ]);
                 }
 
                 $response = json_decode($response, true);
@@ -2614,11 +2630,20 @@ class OzonService
                     }
 
                     if (!$nonshippedItems) {
+                        $date = new \DateTime();
                         app('db')->connection('mysql')->table('orders')
                             ->where('ozon_order_id', $order['ozon_order_id'])
-                            ->update(['status' => config('app.ozon_order_status.DELIVERING')]);
+                            ->update([
+                                'status' => config('app.ozon_order_status.DELIVERING'),
+                                'update_date' => $date->format('Y-m-d H:i:s')
+                                ]);
                     }
                 }
+            }
+            if(strtoupper($status) == strtoupper(config('app.order_delivered_status')))
+            {
+                $response = ['success' => true];
+                $httpCode = 200;
             }
         }
 
