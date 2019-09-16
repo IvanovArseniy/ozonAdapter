@@ -189,7 +189,7 @@ class EddyService
         return [
             'title' => 'Пользователь: ' . $customerId,
             'description' => empty($ticketDescriptionOrders) ? 'Нет заказов' : 'Номера заказов Озон: ' . implode("<br />",$ticketDescriptionOrders),
-            'owner_id' => '2116',
+            'owner_id' => null,
 
         ];
     }
