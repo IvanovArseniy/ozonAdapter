@@ -2559,14 +2559,17 @@ class OzonService
                     $httpCode = $response['http_code'];
                     $response = $response['response'];
                 $response = json_decode($response, true);
-                $date = new \DateTime();
-                app('db')->connection('mysql')->table('orders')
-                    ->where('ozon_order_id', $order['ozon_order_id'])
-                    ->update([
-                        'status' => config('app.ozon_order_status.AWAITING_PACKAGING'),
-                        'update_date' => $date->format('Y-m-d H:i:s')
-                        ]);
                 Log::info($this->interactionId . ' => Approve ozon order result: ' . json_encode($response, JSON_UNESCAPED_UNICODE));
+                
+                if (!isset($response['error'])) {
+                    $date = new \DateTime();
+                    app('db')->connection('mysql')->table('orders')
+                        ->where('ozon_order_id', $order['ozon_order_id'])
+                        ->update([
+                            'status' => config('app.ozon_order_status.AWAITING_PACKAGING'),
+                            'update_date' => $date->format('Y-m-d H:i:s')
+                            ]);
+                }
             }
             if(strtoupper($status) == strtoupper(config('app.order_cancel_status')) || count($toCancel) > 0)
             {
