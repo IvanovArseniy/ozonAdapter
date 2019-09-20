@@ -16,13 +16,12 @@ class Worker extends Command
 
         $worker->addFunction('processOrderNotification', '\App\Services\GearmanService::processOrderNotification');
         $worker->addFunction('processForRetry', '\App\Services\GearmanService::processForRetry');
+        $worker->addFunction('checkApprovedOrders', '\App\Services\GearmanService::checkApprovedOrders');
         $worker->addFunction('processProductToOzon', '\App\Services\GearmanService::processProductToOzon');
         $worker->addFunction('setOzonProductId', '\App\Services\GearmanService::setOzonProductId');
-        $worker->addFunction('updateProduct', '\App\Services\GearmanService::updateProduct');
-        $worker->addFunction('processStockAndPrice', '\App\Services\GearmanService::updateProduct');
         $worker->addFunction('chatEddySync', '\App\Services\GearmanService::syncChatsWithEddy');
         $worker->addFunction('eddyChatSync', '\App\Services\GearmanService::syncFromEddyToChats');
-        $worker->addFunction('checkApprovedOrders', '\App\Services\GearmanService::checkApprovedOrders');
+        $worker->addFunction('updateProduct', '\App\Services\GearmanService::updateProduct');
 
         while (1) {
             $worker->work();

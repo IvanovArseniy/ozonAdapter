@@ -2135,7 +2135,14 @@ class OzonService
             usort($orders, function($o1, $o2) {
                 return intval($o2['order_id']) - intval($o1['order_id']);
             });
-            return $this->getOrderInfoById($orders[0]['order_id']);
+
+            $order = $this->getOzonOrderInfo($orders[0]['order_id']);
+
+            if (!isset($order['error']) && !isset($order['errorCode'])) {
+                return $this->mapOrder($order['result']);
+            }
+
+            return ['error' => 'Error while getting last order!'];
         }
         else return ['error' => 'Error while getting last order!'];
     }
@@ -2191,6 +2198,9 @@ class OzonService
                     continue;
                 }
                 $orderInfo = $this->getOzonOrderInfo($ozonOrder['order_id']);
+                if (!isset($orderInfo['result'])) {
+                    continue;
+                }
                 $orderInfo = $orderInfo['result'];
                 $orderResult = app('db')->connection('mysql')->table('orders')
                     ->insert([
@@ -2343,7 +2353,7 @@ class OzonService
         return $order;
     }
 
-    protected function getOzonOrderInfo($ozonOrderId)
+    public function getOzonOrderInfo($ozonOrderId)
     {
         Log::info($this->interactionId . ' => Get order info from ozon: ' . $ozonOrderId);
         $response = $this->sendData(str_replace('{orderId}', $ozonOrderId, $this->orderInfoUrl), null);

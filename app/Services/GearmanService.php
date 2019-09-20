@@ -11,7 +11,7 @@ class GearmanService
     {
         $client = new \GearmanClient();
         $client->addServers(config('app.gearmman_server'));
-        $client->doBackground('updateProduct', json_encode($data));
+        $client->doLowBackground('updateProduct', json_encode($data));
     }
 
     public static function addOrderNotification($data)
@@ -39,7 +39,7 @@ class GearmanService
     {
         $client = new \GearmanClient();
         $client->addServers(config('app.gearmman_server'));
-        $client->doHighBackground('checkApprovedOrders', json_encode($data));
+        $client->doBackground('checkApprovedOrders', json_encode($data));
     }
     
     public static function addForRetry($data)
@@ -63,7 +63,6 @@ class GearmanService
         $client->addServers(config('app.gearmman_server'));
         $client->doHighBackground('eddyChatSync', json_encode($data));
     }
-
 
     public static function updateProduct(\GearmanJob $job)
     {
@@ -131,18 +130,23 @@ class GearmanService
         }
         $resultedData['data']['try'] = $try;
         if ($try >= 0) {
-            app('db')->connection('mysql')->table('gearman_retry_queue')
-            ->insert(
-                [
-                    'unique_key' => $job->unique(),
-                    'function_name' => $function_name,
-                    'data' => json_encode($resultedData['data']),
-                    'processing' => 0,
-                    'ignored' => (isset($resultedData['ignored']) && $try > 1) ? intval($resultedData['ignored']) : 0,
-                    'reason' => isset($resultedData['reason']) ? $resultedData['reason'] : null,
-                    'sent_date' => date('Y-m-d\TH:i:s.u')
-                ]
-            );
+            try {
+                app('db')->connection('mysql')->table('gearman_retry_queue')
+                ->insert(
+                    [
+                        'unique_key' => $job->unique(),
+                        'function_name' => $function_name,
+                        'data' => json_encode($resultedData['data']),
+                        'processing' => 0,
+                        'ignored' => (isset($resultedData['ignored']) && $try > 1) ? intval($resultedData['ignored']) : 0,
+                        'reason' => isset($resultedData['reason']) ? $resultedData['reason'] : null,
+                        'sent_date' => date('Y-m-d\TH:i:s.u')
+                    ]
+                );
+            }
+            catch (\Exception $e) {
+                $success = false;
+            }
         }
     }
 
