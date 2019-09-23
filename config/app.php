@@ -67,12 +67,10 @@ return [
     'order_status' => [
         'AWAITING_APPROVE' => 'AWAITING_PROCESSING',
         'AWAITING_PACKAGING' => 'PROCESSING', 
-        'AWAITING_DELIVER' => 'PROCESSING',
+        'AWAITING_DELIVER' => 'SHIPPED',
         'DELIVERING' => 'SHIPPED',
-        'DELIVERED' => 'DELIVERED',
-        //'CANCELLED' => 'WILL_NOT_DELIVER',
         'CANCELLED' => 'RETURNED',
-        'DELIVERED' => 'READY_FOR_PICKUP'
+        'DELIVERED' => 'DELIVERED'
     ],
 
     'ozon_order_item_status' => [
