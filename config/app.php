@@ -75,7 +75,8 @@ return [
 
     'ozon_order_item_status' => [
         'awaiting_approve' => 'awaiting_approve',
-        'awaiting_deliver' => 'awaiting_deliver'
+        'awaiting_deliver' => 'awaiting_deliver',
+        'awaiting_packaging' => 'awaiting_packaging'
     ],
 
     'order_item_status' => [

@@ -2355,11 +2355,7 @@ class OzonService
 
     public function getOzonOrderInfo($ozonOrderId)
     {
-        Log::info($this->interactionId . ' => Get order info from ozon: ' . $ozonOrderId);
-        $response = $this->sendData(str_replace('{orderId}', $ozonOrderId, $this->orderInfoUrl), null);
-        $response = $response['response'];
-        Log::info($this->interactionId . ' => Ozon order info: ' . $response);
-        $order = json_decode($response, true);
+        $order = $this->getOzonOrder($ozonOrderId);
 
         if (isset($order['result'])) {
             $fullItems = array();
@@ -2426,6 +2422,16 @@ class OzonService
         else {
             return $order;
         }
+    }
+
+    protected function getOzonOrder($ozonOrderId)
+    {
+        Log::info($this->interactionId . ' => Get order info from ozon: ' . $ozonOrderId);
+        $response = $this->sendData(str_replace('{orderId}', $ozonOrderId, $this->orderInfoUrl), null);
+        $response = $response['response'];
+        Log::info($this->interactionId . ' => Ozon order info: ' . $response);
+        $order = json_decode($response, true);
+        return $order;
     }
 
     protected function mapOrder($order)
@@ -2505,6 +2511,7 @@ class OzonService
     public function setOrderStatus($orderNr, $status, $trackingNumber, $orderItems)
     {
         $response = null;
+        $errorResponse = null;
         $toApprove = [];
         $toCancel = [];
         $toShipped = [];
@@ -2633,13 +2640,25 @@ class OzonService
                     $response = json_decode($response, true);
                     Log::info($this->interactionId . ' => Ship ozon order result: ' . json_encode($response, JSON_UNESCAPED_UNICODE));
 
+                    if (isset($response['error'])) {
+                        $errorResponse = $response;
+                    }
+                    elseif (is_null($response)) {
+                        $errorResponse = ['error' => 'Empty response'];
+                    }
+
                     $nonshippedItems =  false;
-                    $orderInfo = $this->getOzonOrderInfo($order['ozon_order_id']);
-                    foreach ($orderInfo['result']['items'] as $key => $orderItem) {
-                        if ($orderItem['status'] == config('app.ozon_order_item_status.awaiting_deliver') || $orderItem['status'] == config('app.ozon_order_item_status.awaiting_approve')) {
-                            $nonshippedItems = true;
-                            break;
+                    $orderInfo = $this->getOzonOrder($order['ozon_order_id']);
+                    if (isset($orderInfo['result']) && isset($orderInfo['result']['items'])) {
+                        foreach ($orderInfo['result']['items'] as $key => $orderItem) {
+                            if ($orderItem['status'] == config('app.ozon_order_item_status.awaiting_packaging') || $orderItem['status'] == config('app.ozon_order_item_status.awaiting_approve')) {
+                                $nonshippedItems = true;
+                                break;
+                            }
                         }
+                    }
+                    else {
+                        $nonshippedItems =  true;
                     }
 
                     if (!$nonshippedItems) {
@@ -2664,9 +2683,9 @@ class OzonService
             return [
                 'order_id' => $orderNr,
                 'fulfillmentStatus' => $status,
-                'response' => $response,
+                'response' => is_null($errorResponse) ? $response : $errorResponse,
                 'success' => !isset($response['error']),
-                'http_code' => $httpCode
+                'http_code' => is_null($errorResponse) ? $httpCode : 500
             ];
         }
         else {
