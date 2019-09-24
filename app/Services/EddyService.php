@@ -173,6 +173,7 @@ class EddyService
         $orderResult = app('db')->connection('mysql')
             ->table('orders')
             ->where('ozon_order_nr', 'like', $customerId . '-%')
+            ->orWhere('ozon_order_nr','like', '0' . $customerId . '-%')
             ->where('deleted', 0)
             ->get()
             ->all();
