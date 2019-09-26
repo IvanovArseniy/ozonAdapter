@@ -149,6 +149,14 @@ class ChatController extends BaseController
             }
             $exTicketMessages = $es->getTicketMessages($exTicket->eddy_ticket_id);
             $chatMessages = $os->getChatMessages($chatItem['id']);
+            if (!is_array($exTicketMessages))
+            {
+                continue;
+            }
+            if (!is_array($chatMessages))
+            {
+                continue;
+            }
             if (array_key_exists('result',$exTicketMessages) && array_key_exists('result',$chatMessages)){
                 $unsyncedMessagesCount = (count($exTicketMessages['result']) - 1) - count($chatMessages['result']);
                 if ($unsyncedMessagesCount > 0)
