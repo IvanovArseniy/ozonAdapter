@@ -2197,10 +2197,19 @@ class OzonService
                 if ($i > 30) {
                     continue;
                 }
-                $orderInfo = $this->getOzonOrderInfo($ozonOrder['order_id']);
+                
+                $orderInfo = null;
+                try {
+                    $orderInfo = $this->getOzonOrderInfo($ozonOrder['order_id']);
+                }
+                catch (\Exception $e) {
+                    continue;
+                }
+
                 if (!isset($orderInfo['result'])) {
                     continue;
                 }
+                
                 $orderInfo = $orderInfo['result'];
                 $orderResult = app('db')->connection('mysql')->table('orders')
                     ->insert([
@@ -2376,7 +2385,9 @@ class OzonService
                 $productImage = '';
                 if (isset($ozonProduct['result']) && !is_null($ozonProduct['result'])) {
                     $productName = $ozonProduct['result']['name'];
-                    $productImage = $ozonProduct['result']['images'][0];
+                    if (isset($ozonProduct['result']['images'][0])) {
+                        $productImage = $ozonProduct['result']['images'][0];                        
+                    }
                 }
 
                 $productId = null;
