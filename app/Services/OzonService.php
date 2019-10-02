@@ -2632,7 +2632,7 @@ class OzonService
                     if (boolval(preg_match('/^JNTCU(\d){10}YQ$/i', $orderItemShipped['trackingNumber']))) {
                         $shippingProviderCode = config('app.jnet_shipping_provider');
                     }
-                    if (boolval(preg_match('/^PE(\.){7}CRU$/i', $orderItemShipped['trackingNumber']))) {
+                    if (boolval(preg_match('/^PE(.){7}CRU$/i', $orderItemShipped['trackingNumber']))) {
                         $shippingProviderCode = config('app.ponyexpress_shipping_provider');
                     }
 
