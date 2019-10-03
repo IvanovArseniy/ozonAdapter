@@ -184,6 +184,30 @@ class GearmanService
 
             $res = app('db')->connection('mysql')->table('gearman_retry_queue')
                 ->where('processing', 1)
+                ->where('function_name', 'processOrderNotification')
+                ->where('ignored', 0)
+                ->skip(0)
+                ->take(30000)
+                ->get();
+            if ($res) {
+                foreach ($res as $key => $row) {
+                    $unique_key = $row->unique_key;
+                    $function_name = $row->function_name;
+                    $data = $row->data;
+                    if ($function_name == 'processOrderNotification') {
+                        GearmanService::addOrderNotification(json_decode($row->data));
+                    }
+
+                    app('db')->connection('mysql')->table('gearman_retry_queue')
+                        ->where('unique_key', $unique_key)
+                        ->where('function_name', $function_name)
+                        ->delete();
+                }
+            }
+
+            $res = app('db')->connection('mysql')->table('gearman_retry_queue')
+                ->where('processing', 1)
+                ->where('ignored', 0)
                 ->skip(0)
                 ->take(30000)
                 ->get();

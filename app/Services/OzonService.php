@@ -2263,22 +2263,25 @@ class OzonService
             foreach ($orders as $key => $order) {
                 if(!isset($toApprove[$order->ozon_order_id])){
                     //от ozon'а не пришёл - отменён
-                    array_push($notifyingOrderIds, $order->ozon_order_nr);
-                    $notifyingOrders = $this->processOrderNotification($notifyingOrders, [
-                        'data' => null,
-                        'type' => 'decline',
-                        'notified' => 0,
-                        'order_id' => $order->ozon_order_id,
-                        'order_nr' => $order->ozon_order_nr
-                    ]);
-
-                    $date = new \DateTime();
-                    app('db')->connection('mysql')->table('orders')
-                        ->where('ozon_order_id', $order->ozon_order_id)
-                        ->update([
-                            'status' => config('app.ozon_order_status.CANCELLED'),
-                            'update_date' => $date->format('Y-m-d H:i:s')
-                            ]);
+                    $orderInfo = $this->getOzonOrder($order->ozon_order_id);
+                    if (isset($orderInfo['result']) && strtoupper($orderInfo['result']['status']) == config('app.ozon_order_status.CANCELLED')) {
+                        array_push($notifyingOrderIds, $order->ozon_order_nr);
+                        $notifyingOrders = $this->processOrderNotification($notifyingOrders, [
+                            'data' => null,
+                            'type' => 'decline',
+                            'notified' => 0,
+                            'order_id' => $order->ozon_order_id,
+                            'order_nr' => $order->ozon_order_nr
+                        ]);
+    
+                        $date = new \DateTime();
+                        app('db')->connection('mysql')->table('orders')
+                            ->where('ozon_order_id', $order->ozon_order_id)
+                            ->update([
+                                'status' => config('app.ozon_order_status.CANCELLED'),
+                                'update_date' => $date->format('Y-m-d H:i:s')
+                                ]);
+                    }
                 }
             }
         }
