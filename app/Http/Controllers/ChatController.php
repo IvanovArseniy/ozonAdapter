@@ -23,7 +23,7 @@ class ChatController extends BaseController
         }
         file_put_contents(storage_path() . '/app/chatsync.lock', 'Start');
         $chatAnswer = $os->getChats();
-        if (!$chatAnswer)
+        if (!$chatAnswer || !is_array($chatAnswer))
         {
             $unlink = unlink(storage_path() . '/app/chatsync.lock');
             Log::info('Unlink chatsynk.lock cause getChats error.');
@@ -34,81 +34,88 @@ class ChatController extends BaseController
         Log::info('Chats count getted: ' . count($chatList));
         foreach ($chatList as $chatItem)
         {
-            if ($os->isChatTicketExists($chatItem['id']))
-            {
-                while (true)
+                if ($os->isChatTicketExists($chatItem['id']))
                 {
-                    $ticket = $es::getByExistingChatId($chatItem['id']);
-                    if ($chatItem['last_message_id'] == $ticket->last_added_message_id)
+                    while (true)
                     {
-                        break;
-                    }
-                    $chatMessages = $os->getChatMessages($chatItem['id'],$ticket->last_added_message_id,10);
-                    if (!array_key_exists('result',$chatMessages))
-                    {
-                        continue;
-                    }
-                    foreach ($chatMessages['result'] as $chatMessage)
-                    {
-                        if (empty($chatMessage)){
-                            continue;
-                        }
-
-                        if ($chatMessage['type'] == 'file')
+                        $ticket = $es::getByExistingChatId($chatItem['id']);
+                        if ($chatItem['last_message_id'] == $ticket->last_added_message_id)
                         {
-                            $chatMessage['text'] = "<a href={$chatMessage['file']['url']}>{$chatMessage['file']['name']}</a>";
+                            break;
                         }
-                        $isMessageAdded = $es->addMessage($ticket->eddy_ticket_id, $chatMessage['text'],null);
+                        $chatMessages = $os->getChatMessages($chatItem['id'],$ticket->last_added_message_id,10);
+                        if (!array_key_exists('result',$chatMessages) || !is_array($chatMessages))
+                        {
+                            Log::info('[SyncChat] error' . ' no chat messages result key');
+                            if (array_key_exists('error',$chatMessages)){
+                                Log::info('[SyncChat] error' . $chatMessages["error"]["message"]);
+                            }
+                            break;
+                        }
+                        foreach ($chatMessages['result'] as $chatMessage)
+                        {
+                            if (empty($chatMessage)){
+                                continue;
+                            }
+
+                            if ($chatMessage['type'] == 'file')
+                            {
+                                $chatMessage['text'] = "<a href={$chatMessage['file']['url']}>{$chatMessage['file']['name']}</a>";
+                            }
+                            $isMessageAdded = $es->addMessage($ticket->eddy_ticket_id, $chatMessage['text'],null);
+                        }
+                        $es::updateRegisteredTicket($ticket->eddy_ticket_id,['last_added_message_id'=>$chatMessage['id']]);;
                     }
-                    $es::updateRegisteredTicket($ticket->eddy_ticket_id,['last_added_message_id'=>$chatMessage['id']]);;
-                }
-                continue;
-            }
-            else{
-                $ticket = $es->addTicket($chatItem);
-                if (isset($ticket['errors'])){
-                    Log::info('addTicket error: ' . $chatItem['id']);
                     continue;
                 }
-                $newTicketsCount += 1;
-                $es->registerTicketInDb($chatItem,$ticket['data']);
-                while (true)
-                {
-                    sleep(1);
-                    $exTicket = $es::getByExistingChatId($chatItem['id']);
-                    if ($exTicket == null || !is_object($exTicket))
-                    {
-                        Log::info('Bad exTicket: ' . $chatItem['id']);
+                else{
+                    $ticket = $es->addTicket($chatItem);
+                    if (isset($ticket['errors'])){
+                        Log::info('[SyncChat] Add Ticket error. Chat id = ' . $chatItem['id']);
                         continue;
                     }
-                    if ($exTicket->last_added_message_id == $chatItem['last_message_id']){
-                        break;
-                    }
-                    $chatMessages = $os->getChatMessages($chatItem['id'],$exTicket->last_added_message_id,10);
-                    if (!array_key_exists('errors',$ticket))
+                    $newTicketsCount += 1;
+                    $es->registerTicketInDb($chatItem,$ticket['data']);
+                    while (true)
                     {
-                        if (is_array($chatMessages) && array_key_exists('result', $chatMessages))
+                        sleep(1);
+                        $exTicket = $es::getByExistingChatId($chatItem['id']);
+                        if ($exTicket == null || !is_object($exTicket))
                         {
-                            foreach ($chatMessages['result'] as $chatMessage)
+                            Log::info('Bad exTicket: ' . $chatItem['id']);
+                            continue;
+                        }
+                        if ($exTicket->last_added_message_id == $chatItem['last_message_id']){
+                            break;
+                        }
+                        $chatMessages = $os->getChatMessages($chatItem['id'],$exTicket->last_added_message_id,10);
+                        if (!array_key_exists('errors',$ticket))
+                        {
+                            if (is_array($chatMessages) && array_key_exists('result', $chatMessages))
                             {
-                                if (empty($chatMessage)){
-                                    continue;
-                                }
-                                if ($chatMessage['type'] == 'file')
+                                foreach ($chatMessages['result'] as $chatMessage)
                                 {
-                                    $chatMessage['text'] = "<a href={$chatMessage['file']['url']}>{$chatMessage['file']['name']}</a>";
+                                    if (empty($chatMessage)){
+                                        continue;
+                                    }
+                                    if ($chatMessage['type'] == 'file')
+                                    {
+                                        $chatMessage['text'] = "<a href={$chatMessage['file']['url']}>{$chatMessage['file']['name']}</a>";
+                                    }
+                                    $isMessageAdded = $es->addMessage($ticket['data']['id'], $chatMessage['text'],null);
                                 }
-                                $isMessageAdded = $es->addMessage($ticket['data']['id'], $chatMessage['text'],null);
+                                $es::updateRegisteredTicket($exTicket->eddy_ticket_id,['last_added_message_id'=>$chatMessage['id']]);;
                             }
-                            $es::updateRegisteredTicket($exTicket->eddy_ticket_id,['last_added_message_id'=>$chatMessage['id']]);;
+                            else{
+                                break;
+                            }
+                        }
+                        else{
+                            Log::info('Add ticket error: ' . print_r($ticket['errors']));
+                            break;
                         }
                     }
-                    else{
-                        Log::info('Add ticket error: ' . print_r($ticket['errors']));
-                        continue;
-                    }
                 }
-            }
         }
         $unlink = unlink(storage_path() . '/app/chatsync.lock');
         Log::info('New tickets count: ' . $newTicketsCount);
