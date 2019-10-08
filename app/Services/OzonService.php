@@ -1120,11 +1120,10 @@ class OzonService
                 else {
                     $success = false;
                     array_push($result, ['error' => $variantToUpdate['result']]);
-                    break;
                 }
             }
 
-            if ($success) {
+            if (count($variantsToUpdate) > 0) {
                 foreach ($variantsToUpdate as $key => $toUpdate) {
                     $item = [
                         'enabled' => $product['enabled']
