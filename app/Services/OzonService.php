@@ -268,7 +268,7 @@ class OzonService
                     break;
                 }
             }
-            $price = round((floatval($variant['priceRaw']) / 1.0815 * 1.035) + ($shippingPrice * 1.035), 2);
+            $price = round((floatval($variant['priceRaw']) / 1.0815 * 1.048) + ($shippingPrice * 1.048), 2);
 
             $quantity = 0;
             if (isset($variant['isPromo']) && boolval($variant['isPromo'])) {
@@ -1069,7 +1069,7 @@ class OzonService
                             break;
                         }
                     }
-                    $price = round((floatval($variant['priceRaw']) / 1.0815 * 1.035) + ($shippingPrice * 1.035), 2);
+                    $price = round((floatval($variant['priceRaw']) / 1.0815 * 1.048) + ($shippingPrice * 1.048), 2);
                     $item['price'] = $price;
                 }
 
@@ -1088,7 +1088,10 @@ class OzonService
 
                 $variantToUpdate = $this->checkOzonProducts($productId, $variant['mallVariantId']);
                 if (isset($variantToUpdate['Success']) && $variantToUpdate['Success']) {
-                    $item['quantity'] = intval($item['quantity']) + $variantToUpdate['reservedStock'];
+                    $item['quantity'] = intval($item['quantity']);
+                    if (intval($item['quantity']) > 0) {
+                        $item['quantity'] = intval($item['quantity']) + $variantToUpdate['reservedStock'];
+                    }
                     if (!boolval($product['enabled'])) {
                         $item['quantity'] = 0;
                     }
@@ -1271,7 +1274,7 @@ class OzonService
                             break;
                         }
                     }
-                    $price = round((floatval($variant['priceRaw']) / 1.0815 * 1.035) + ($shippingPrice * 1.035), 2);
+                    $price = round((floatval($variant['priceRaw']) / 1.0815 * 1.048) + ($shippingPrice * 1.048), 2);
                     $item['price'] = $price;
                 }
 
